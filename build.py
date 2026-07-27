@@ -3,6 +3,9 @@ import sys
 import os
 import shutil
 
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8")
+
 
 def get_python_executable():
     exe = sys.executable
