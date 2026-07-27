@@ -1058,6 +1058,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("多通道工业数据采集系统 — Modbus TCP/RTU / Keyence PLC")
         self.resize(1400, 900)
+        self.setMinimumSize(800, 600)
 
         self.store = DataStore(max_points=10000)
         self.worker = AcquisitionWorker(self.store)
