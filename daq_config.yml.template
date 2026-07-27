@@ -1,0 +1,84 @@
+connections:
+  keyence_plc1:
+    params:
+      host: 192.168.1.200
+      port: 3000
+      unit: 0
+    type: keyence
+  modbus_rtu_device1:
+    params:
+      baudrate: 9600
+      bytesize: 8
+      parity: N
+      port: COM1
+      slave_id: 1
+      stopbits: 1
+    type: modbus_rtu
+  modbus_tcp_device1:
+    params:
+      host: 192.168.1.100
+      port: 502
+      slave_id: 1
+    type: modbus_tcp
+poll_interval: 0.5
+tasks:
+- channel_name: 温度传感器
+  channel_prefix: temp
+  connection_id: modbus_tcp_device1
+  connection_type: modbus_tcp
+  data_type: uint16
+  device_type: holding
+  offset: 0
+  quantity: 4
+  scale: 0.1
+  start_addr: 0
+  task_id: task_temp_sensor
+  unit: °C
+- channel_name: 压力变送器
+  channel_prefix: pressure
+  connection_id: modbus_tcp_device1
+  connection_type: modbus_tcp
+  data_type: uint16
+  device_type: input
+  offset: 0
+  quantity: 2
+  scale: 0.001
+  start_addr: 100
+  task_id: task_pressure
+  unit: MPa
+- channel_name: 数字输入
+  channel_prefix: di
+  connection_id: modbus_tcp_device1
+  connection_type: modbus_tcp
+  data_type: uint16
+  device_type: coil
+  offset: 0
+  quantity: 8
+  scale: 1.0
+  start_addr: 0
+  task_id: task_digital_input
+  unit: ''
+- channel_name: DM寄存器
+  channel_prefix: keyence_dm
+  connection_id: keyence_plc1
+  connection_type: keyence
+  data_type: uint16
+  device_type: DM
+  offset: 0
+  quantity: 10
+  scale: 1.0
+  start_addr: 0
+  task_id: task_keyence_dm
+  unit: ''
+- channel_name: 温度
+  channel_prefix: temp
+  connection_id: modbus_tcp_device1
+  connection_type: modbus_tcp
+  data_type: uint16
+  device_type: holding
+  offset: 0.0
+  quantity: 1
+  scale: 1.0
+  start_addr: 0
+  task_id: task_1785122636361
+  unit: ''
