@@ -141,7 +141,151 @@ class DataStore:
 
 
 # ================================================================
-#  第二部分: Modbus TCP 连接器 (原生 socket 实现)
+#  第二部分: 字节序解码器
+# ================================================================
+class ByteOrderDecoder:
+    """
+    字节序解码器 — 支持所有标准 Modbus 字节序和数据类型
+
+    字节序说明 (以32位为例，4个字节 A B C D):
+    - ABCD (big):    大端序，字节顺序 A→B→C→D (Motorola)
+    - DCBA (little): 小端序，字节顺序 D→C→B→A (Intel)
+    - BADC (swap16): 双字节交换，字节顺序 B→A→D→C
+    - CDAB (swap32): 四字交换，字节顺序 C→D→A→B
+
+    支持的数据类型:
+    - int16, uint16    (1个寄存器 = 2字节)
+    - int32, uint32    (2个寄存器 = 4字节)
+    - float32          (2个寄存器 = 4字节)
+    - int64, uint64    (4个寄存器 = 8字节)
+    - float64          (4个寄存器 = 8字节)
+    """
+
+    _TYPE_INFO = {
+        "int16":   {"size": 2, "fmt": ">h"},
+        "uint16":  {"size": 2, "fmt": ">H"},
+        "int32":   {"size": 4, "fmt": ">i"},
+        "uint32":  {"size": 4, "fmt": ">I"},
+        "float32": {"size": 4, "fmt": ">f"},
+        "int64":   {"size": 8, "fmt": ">q"},
+        "uint64":  {"size": 8, "fmt": ">Q"},
+        "float64": {"size": 8, "fmt": ">d"},
+    }
+
+    @classmethod
+    def decode(cls, raw_bytes: bytes, data_type: str, byte_order: str = "abcd") -> list:
+        """
+        将原始字节解码为指定数据类型和字节序的值列表
+
+        Args:
+            raw_bytes: 原始字节数据（每个寄存器2字节，网络字节序）
+            data_type: 数据类型，如 "uint16", "int32", "float32", "float64" 等
+            byte_order: 字节序，可选值 "abcd", "dcba", "badc", "cdab"
+
+        Returns:
+            解码后的值列表
+        """
+        type_info = cls._TYPE_INFO.get(data_type.lower())
+        if type_info is None:
+            raise ValueError(f"不支持的数据类型: {data_type}")
+
+        value_size = type_info["size"]
+        fmt = type_info["fmt"]
+        results = []
+
+        for i in range(0, len(raw_bytes), value_size):
+            chunk = raw_bytes[i:i + value_size]
+            if len(chunk) < value_size:
+                break
+
+            reordered = cls._reorder_bytes(chunk, byte_order.lower())
+            value = struct.unpack(fmt, reordered)[0]
+            results.append(float(value))
+
+        return results
+
+    @classmethod
+    def _reorder_bytes(cls, data: bytes, byte_order: str) -> bytes:
+        """
+        根据字节序重新排列字节
+
+        Args:
+            data: 原始字节数据
+            byte_order: 目标字节序
+
+        Returns:
+            重新排列后的字节
+        """
+        n = len(data)
+
+        if byte_order == "abcd":
+            return data
+        elif byte_order == "dcba":
+            return data[::-1]
+        elif byte_order == "badc":
+            if n >= 2:
+                chunks = [data[i:i + 2][::-1] for i in range(0, n, 2)]
+                return b"".join(chunks)
+            return data
+        elif byte_order == "cdab":
+            if n >= 4:
+                words = [data[i:i + 2] for i in range(0, n, 2)]
+                swapped = []
+                for j in range(0, len(words), 2):
+                    if j + 1 < len(words):
+                        swapped.append(words[j + 1])
+                        swapped.append(words[j])
+                    else:
+                        swapped.append(words[j])
+                return b"".join(swapped)
+            return data
+        else:
+            raise ValueError(f"不支持的字节序: {byte_order}")
+
+    @classmethod
+    def get_supported_types(cls) -> list:
+        """返回支持的所有数据类型列表"""
+        return list(cls._TYPE_INFO.keys())
+
+    @classmethod
+    def get_supported_byte_orders(cls) -> list:
+        """返回支持的所有字节序列表"""
+        return ["abcd", "dcba", "badc", "cdab"]
+
+    @classmethod
+    def test(cls):
+        """单元测试 — 验证字节序解码正确性"""
+        tests = [
+            ("uint16", "abcd", b"\x00\x0A", [10.0]),
+            ("uint16", "dcba", b"\x0A\x00", [10.0]),
+            ("uint16", "badc", b"\x0A\x00", [10.0]),
+            ("uint16", "cdab", b"\x00\x0A", [10.0]),
+            ("int16", "abcd", b"\xFF\xF6", [-10.0]),
+            ("uint32", "abcd", b"\x00\x00\x00\x64", [100.0]),
+            ("uint32", "dcba", b"\x64\x00\x00\x00", [100.0]),
+            ("uint32", "badc", b"\x00\x00\x64\x00", [100.0]),
+            ("uint32", "cdab", b"\x00\x64\x00\x00", [100.0]),
+            ("int32", "abcd", b"\xFF\xFF\xFF\x9C", [-100.0]),
+            ("float32", "abcd", b"\x41\x20\x00\x00", [10.0]),
+            ("float64", "abcd", b"\x40\x24\x00\x00\x00\x00\x00\x00", [10.0]),
+        ]
+        all_pass = True
+        for data_type, byte_order, raw_bytes, expected in tests:
+            try:
+                result = cls.decode(raw_bytes, data_type, byte_order)
+                if result == expected:
+                    print(f"✓ {data_type}/{byte_order}: {raw_bytes.hex()} -> {result}")
+                else:
+                    print(f"✗ {data_type}/{byte_order}: {raw_bytes.hex()} -> {result}, expected {expected}")
+                    all_pass = False
+            except Exception as e:
+                print(f"✗ {data_type}/{byte_order}: {e}")
+                all_pass = False
+        return all_pass
+
+
+# ================================================================
+#  第三部分: Modbus TCP 连接器 (原生 socket 实现)
 # ================================================================
 class ModbusTCPConnector:
     """Modbus TCP 连接器 — 纯 socket 实现，无 pymodbus 依赖"""
@@ -239,6 +383,29 @@ class ModbusTCPConnector:
             return None
         return self._parse_bit_response(resp, quantity)
 
+    def read_holding_registers_raw(self, start_addr: int, quantity: int) -> Optional[bytes]:
+        resp = self._send_request(self.FUNC_READ_HOLDING, start_addr, quantity)
+        if resp is None:
+            return None
+        return self._extract_raw_register_data(resp)
+
+    def read_input_registers_raw(self, start_addr: int, quantity: int) -> Optional[bytes]:
+        resp = self._send_request(self.FUNC_READ_INPUT_REG, start_addr, quantity)
+        if resp is None:
+            return None
+        return self._extract_raw_register_data(resp)
+
+    def _extract_raw_register_data(self, resp: bytes) -> Optional[bytes]:
+        if len(resp) < 9:
+            return None
+        func_code = resp[7]
+        if func_code & 0x80:
+            exc_code = resp[8] if len(resp) > 8 else -1
+            print(f"[Modbus] 异常响应: func={func_code:#x}, exc={exc_code}")
+            return None
+        byte_count = resp[8]
+        return resp[9:9 + byte_count]
+
     def _parse_register_response(self, resp: bytes):
         if len(resp) < 9:
             return None
@@ -278,7 +445,7 @@ class ModbusTCPConnector:
 
 
 # ================================================================
-#  第三部分: Modbus RTU 连接器 (串口实现)
+#  第四部分: Modbus RTU 连接器 (串口实现)
 # ================================================================
 class ModbusRTUConnector:
     """Modbus RTU 连接器 — 使用 pyserial 实现串口通信"""
@@ -437,6 +604,29 @@ class ModbusRTUConnector:
             return None
         return self._parse_bit_response(resp, quantity)
 
+    def read_holding_registers_raw(self, start_addr: int, quantity: int) -> Optional[bytes]:
+        resp = self._send_request(self.FUNC_READ_HOLDING, start_addr, quantity)
+        if resp is None:
+            return None
+        return self._extract_raw_register_data(resp)
+
+    def read_input_registers_raw(self, start_addr: int, quantity: int) -> Optional[bytes]:
+        resp = self._send_request(self.FUNC_READ_INPUT_REG, start_addr, quantity)
+        if resp is None:
+            return None
+        return self._extract_raw_register_data(resp)
+
+    def _extract_raw_register_data(self, resp: bytes) -> Optional[bytes]:
+        if len(resp) < 5:
+            return None
+        func_code = resp[1]
+        if func_code & 0x80:
+            exc_code = resp[2] if len(resp) > 2 else -1
+            print(f"[Modbus RTU] 异常响应: func={func_code:#x}, exc={exc_code}")
+            return None
+        byte_count = resp[2]
+        return resp[3:3 + byte_count]
+
     def _parse_register_response(self, resp: bytes):
         if len(resp) < 5:
             return None
@@ -578,12 +768,24 @@ class KeyencePLCConnector:
 class PollingTask:
     """单个采集任务配置"""
 
+    _TYPE_TO_REGISTERS = {
+        "int16":   1,
+        "uint16":  1,
+        "int32":   2,
+        "uint32":  2,
+        "float32": 2,
+        "int64":   4,
+        "uint64":  4,
+        "float64": 4,
+    }
+
     def __init__(self, task_id: str, connection_id: str,
                  connection_type: str, device_type: str,
                  start_addr: int, quantity: int,
                  channel_prefix: str, channel_name: str,
                  unit: str = "", scale: float = 1.0,
-                 offset: float = 0.0, data_type: str = "uint16"):
+                 offset: float = 0.0, data_type: str = "uint16",
+                 byte_order: str = "abcd"):
         self.task_id = task_id
         self.connection_id = connection_id
         self.connection_type = connection_type
@@ -596,15 +798,26 @@ class PollingTask:
         self.scale = scale
         self.offset = offset
         self.data_type = data_type
+        self.byte_order = byte_order
+
+    def get_registers_per_value(self) -> int:
+        """获取每个值需要的寄存器数量"""
+        return self._TYPE_TO_REGISTERS.get(self.data_type.lower(), 1)
+
+    def get_total_registers(self) -> int:
+        """获取总共需要读取的寄存器数量"""
+        return self.quantity * self.get_registers_per_value()
 
     def get_channel_ids(self):
-        return [f"{self.channel_prefix}_{self.start_addr + i}"
+        reg_per_val = self.get_registers_per_value()
+        return [f"{self.channel_prefix}_{self.start_addr + i * reg_per_val}"
                 for i in range(self.quantity)]
 
     def get_channel_names(self):
         if self.quantity == 1:
             return [self.channel_name]
-        return [f"{self.channel_name}[{self.start_addr + i}]"
+        reg_per_val = self.get_registers_per_value()
+        return [f"{self.channel_name}[{self.start_addr + i * reg_per_val}]"
                 for i in range(self.quantity)]
 
     def to_dict(self):
@@ -612,12 +825,13 @@ class PollingTask:
             "task_id", "connection_id", "connection_type",
             "device_type", "start_addr", "quantity",
             "channel_prefix", "channel_name", "unit",
-            "scale", "offset", "data_type"
+            "scale", "offset", "data_type", "byte_order"
         ]}
 
     @classmethod
     def from_dict(cls, d):
-        return cls(**d)
+        byte_order = d.pop("byte_order", "abcd")
+        return cls(byte_order=byte_order, **d)
 
 
 class AcquisitionWorker(QObject):
@@ -726,14 +940,24 @@ class AcquisitionWorker(QObject):
 
     def _poll_one(self, connector, task: PollingTask):
         if isinstance(connector, ModbusTCPConnector) or isinstance(connector, ModbusRTUConnector):
-            if task.device_type == "holding":
-                return connector.read_holding_registers(task.start_addr, task.quantity)
-            elif task.device_type == "input":
-                return connector.read_input_registers(task.start_addr, task.quantity)
-            elif task.device_type == "coil":
+            if task.device_type == "coil":
                 return connector.read_coils(task.start_addr, task.quantity)
             else:
-                return connector.read_holding_registers(task.start_addr, task.quantity)
+                total_registers = task.get_total_registers()
+                if task.device_type == "holding":
+                    raw_bytes = connector.read_holding_registers_raw(task.start_addr, total_registers)
+                elif task.device_type == "input":
+                    raw_bytes = connector.read_input_registers_raw(task.start_addr, total_registers)
+                else:
+                    raw_bytes = connector.read_holding_registers_raw(task.start_addr, total_registers)
+                
+                if raw_bytes is None:
+                    return None
+                try:
+                    return ByteOrderDecoder.decode(raw_bytes, task.data_type, task.byte_order)
+                except Exception as e:
+                    print(f"[ByteOrderDecoder] 解码失败: {e}")
+                    return None
         elif isinstance(connector, KeyencePLCConnector):
             return connector.read_device(task.device_type, task.start_addr, task.quantity)
         return None
@@ -1002,6 +1226,24 @@ class TaskConfigDialog(QWidget):
         self.spin_offset.setDecimals(6)
         layout.addWidget(self.spin_offset, 8, 1)
 
+        layout.addWidget(QLabel("数据类型:"), 9, 0)
+        self.cmb_data_type = QComboBox()
+        self.cmb_data_type.addItems([
+            "uint16", "int16", "uint32", "int32",
+            "float32", "uint64", "int64", "float64"
+        ])
+        self.cmb_data_type.setCurrentText("uint16")
+        layout.addWidget(self.cmb_data_type, 9, 1)
+
+        layout.addWidget(QLabel("字节序:"), 10, 0)
+        self.cmb_byte_order = QComboBox()
+        self.cmb_byte_order.addItems([
+            "abcd (大端)", "dcba (小端)",
+            "badc (双字节交换)", "cdab (四字交换)"
+        ])
+        self.cmb_byte_order.setCurrentText("abcd (大端)")
+        layout.addWidget(self.cmb_byte_order, 10, 1)
+
         self.cmb_conn.currentIndexChanged.connect(self._on_conn_changed)
         self._on_conn_changed()
 
@@ -1012,7 +1254,7 @@ class TaskConfigDialog(QWidget):
         btn_cancel.clicked.connect(self.close)
         btn_layout.addWidget(btn_ok)
         btn_layout.addWidget(btn_cancel)
-        layout.addLayout(btn_layout, 9, 0, 1, 2)
+        layout.addLayout(btn_layout, 11, 0, 1, 2)
 
     def _on_conn_changed(self):
         cid = self.cmb_conn.currentData()
@@ -1032,6 +1274,11 @@ class TaskConfigDialog(QWidget):
             QMessageBox.warning(self, "警告", "请填写通道前缀和名称")
             return
         cid = self.cmb_conn.currentData()
+        
+        data_type = self.cmb_data_type.currentText()
+        byte_order_text = self.cmb_byte_order.currentText()
+        byte_order = byte_order_text.split()[0]
+        
         task_dict = {
             "task_id": f"task_{int(time.time()*1000)}",
             "connection_id": cid,
@@ -1044,7 +1291,8 @@ class TaskConfigDialog(QWidget):
             "unit": self.edit_unit.text().strip(),
             "scale": self.spin_scale.value(),
             "offset": self.spin_offset.value(),
-            "data_type": "uint16",
+            "data_type": data_type,
+            "byte_order": byte_order,
         }
         self.task_added.emit(task_dict)
         self.close()
