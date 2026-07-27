@@ -1,10 +1,10 @@
 connections:
   delta_dte10t:
     params:
-      baudrate: 9600
-      bytesize: 7
+      baudrate: 115200
+      bytesize: 8
       parity: E
-      port: COM1
+      port: COM8
       slave_id: 1
       stopbits: 1
     type: modbus_rtu
