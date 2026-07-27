@@ -747,6 +747,7 @@ class ChartWidget(pg.PlotWidget):
 
     def __init__(self, title: str = "", parent=None):
         super().__init__(parent)
+        self.setMinimumHeight(200)
         self.setBackground("#1e1e2e")
         self.setTitle(title, color="#cdd6f4", size="10pt")
         self.setLabel("left", color="#a6adc8")
