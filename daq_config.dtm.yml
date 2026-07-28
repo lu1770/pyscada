@@ -1,0 +1,91 @@
+# ================================================================
+# Delta DTME 温度控制器数据采集配置文件
+# 协议: Modbus TCP
+# 设备型号: DTME04, DTME08
+# 参考文档: Delta_IA_TC_DTME_OM_TC_20250115.pdf
+# ================================================================
+
+# ---------------------------
+# 全局配置
+# ---------------------------
+poll_interval: 0.5
+
+# ---------------------------
+# 设备连接配置
+# ---------------------------
+connections:
+  # Delta DTME 温度控制器
+  # 参考文档 1.3 节：默认 IP 为 192.168.1.5
+  dtme_temp_controller:
+    type: modbus_tcp
+    params:
+      # 设备IP地址
+      host: 192.168.1.5
+      # Modbus TCP 标准端口
+      port: 502
+      # 从站地址 (Modbus TCP Server模式下通常设为1)
+      slave_id: 1
+
+# ---------------------------
+# 采集任务配置
+# ---------------------------
+tasks:
+  # ================================================================
+  # 任务 1: 采集当前温度值 (PV - Present Value)
+  # 参考文档 4.2.1 节 IN/OUT 暂存器位址设定
+  # IN 1 对应地址 X268H (十进制 616) -> MON-PV1 CH1 Present Value
+  # IN 8 对应地址 X26FH (十进制 623) -> MON-PV8 CH8 Present Value
+  # ================================================================
+  - task_id: task_dtme_pv
+    connection_id: dtme_temp_controller
+    connection_type: modbus_tcp
+    device_type: holding  # 对应功能码 0x03
+    start_addr: 616       # X268H (CH1 PV)
+    quantity: 8           # 连续读取8个通道 (CH1 ~ CH8)
+    data_type: int16      # 温度可能包含负值，使用有符号16位整数
+    byte_order: abcd
+    channel_prefix: PV_CH
+    channel_name: DTME温度控制器-当前温度
+    unit: °C
+    scale: 1.0            # 根据设备实际精度调整缩放比例
+    offset: 0
+
+  # ================================================================
+  # 任务 2: 采集设定温度值 (SV - Setpoint Value)
+  # 参考文档 4.2.1 节 IN/OUT 暂存器位址设定
+  # IN 9 对应地址 X270H (十进制 624) -> MON-SV1 CH1 Setpoint Value
+  # IN 16 对应地址 X277H (十进制 631) -> MON-SV8 CH8 Setpoint Value
+  # ================================================================
+  - task_id: task_dtme_sv
+    connection_id: dtme_temp_controller
+    connection_type: modbus_tcp
+    device_type: holding
+    start_addr: 624       # X270H (CH1 SV)
+    quantity: 8           # 连续读取8个通道 (CH1 ~ CH8)
+    data_type: int16
+    byte_order: abcd
+    channel_prefix: SV_CH
+    channel_name: DTME温度控制器-设定温度
+    unit: °C
+    scale: 1.0
+    offset: 0
+
+  # ================================================================
+  # 任务 3: 采集输出功率百分比 (OUT Power)
+  # 参考文档 4.2.1 节 IN/OUT 暂存器位址设定
+  # IN 17 对应地址 X278H (十进制 632) -> MON-O1P1 CH1 % OUT1 power
+  # IN 24 对应地址 X27FH (十进制 639) -> MON-O1P8 CH8 % OUT1 power
+  # ================================================================
+  - task_id: task_dtme_output_power
+    connection_id: dtme_temp_controller
+    connection_type: modbus_tcp
+    device_type: holding
+    start_addr: 632       # X278H (CH1 Output Power)
+    quantity: 8           # 连续读取8个通道 (CH1 ~ CH8)
+    data_type: uint16     # 功率百分比通常为正整数
+    byte_order: abcd
+    channel_prefix: POWER_CH
+    channel_name: DTME温度控制器-输出功率
+    unit: '%'
+    scale: 1.0
+    offset: 0

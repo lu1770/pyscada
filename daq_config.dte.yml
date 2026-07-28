@@ -8,7 +8,7 @@ connections:
       slave_id: 1
       stopbits: 1
     type: modbus_rtu
-poll_interval: 0.5
+poll_interval: 1
 tasks:
 - byte_order: abcd
   channel_name: CH1当前温度

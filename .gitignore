@@ -1,3 +1,4 @@
 /dist/*
 build/
 DAQ_System.spec
+__pycache__/

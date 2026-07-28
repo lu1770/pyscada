@@ -972,11 +972,11 @@ class ChartWidget(pg.PlotWidget):
     def __init__(self, title: str = "", parent=None):
         super().__init__(parent)
         self.setMinimumHeight(200)
-        self.setBackground("#1e1e2e")
-        self.setTitle(title, color="#cdd6f4", size="10pt")
-        self.setLabel("left", color="#a6adc8")
-        self.setLabel("bottom", "时间(s)", color="#a6adc8")
-        self.showGrid(x=True, y=True, alpha=0.15)
+        self.setBackground("#eff1f5")
+        self.setTitle(title, color="#4c4f69", size="10pt")
+        self.setLabel("left", color="#4c4f69")
+        self.setLabel("bottom", "时间(s)", color="#4c4f69")
+        self.showGrid(x=True, y=True, alpha=0.3)
         self._curves = {}
         self._colors = [
             "#f38ba8", "#fab387", "#f9e2af", "#a6e3a1",
@@ -1387,6 +1387,7 @@ class MainWindow(QMainWindow):
         self.table_conn = QTableWidget(0, 5)
         self.table_conn.setHorizontalHeaderLabels(["连接ID", "类型", "IP地址", "端口", "状态"])
         self.table_conn.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table_conn.setEditTriggers(QTableWidget.DoubleClicked | QTableWidget.EditKeyPressed)
         conn_layout.addWidget(self.table_conn)
         conn_group.setLayout(conn_layout)
         left_layout.addWidget(conn_group)
@@ -1397,6 +1398,7 @@ class MainWindow(QMainWindow):
         self.table_task.setHorizontalHeaderLabels(
             ["连接ID", "类型", "设备类型", "起始地址", "数量", "通道前缀", "通道名称", "单位"])
         self.table_task.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table_task.setEditTriggers(QTableWidget.DoubleClicked | QTableWidget.EditKeyPressed)
         task_layout.addWidget(self.table_task)
         task_group.setLayout(task_layout)
         left_layout.addWidget(task_group)
@@ -1450,6 +1452,8 @@ class MainWindow(QMainWindow):
         self.worker.data_acquired.connect(self._on_data_acquired)
         self.worker.connection_status.connect(self._on_conn_status)
         self.worker.error_occurred.connect(self._on_error)
+        self.table_conn.cellChanged.connect(self._on_conn_cell_changed)
+        self.table_task.cellChanged.connect(self._on_task_cell_changed)
 
     # ---- 连接管理 ----
     def _on_add_connection(self):
@@ -1465,6 +1469,84 @@ class MainWindow(QMainWindow):
         self.worker.add_connection(conn_id, conn_type, **params)
         self._refresh_conn_table()
         self.status_bar.showMessage(f"已添加连接: {conn_id}", 3000)
+
+    def _on_conn_cell_changed(self, row, col):
+        if row < 0 or row >= len(self._connections):
+            return
+        conn_ids = list(self._connections.keys())
+        conn_id = conn_ids[row]
+        new_value = self.table_conn.item(row, col).text().strip()
+        
+        if col == 0:
+            if not new_value:
+                QMessageBox.warning(self, "警告", "连接ID不能为空")
+                self.table_conn.blockSignals(True)
+                self._refresh_conn_table()
+                self.table_conn.blockSignals(False)
+                return
+            if new_value != conn_id and new_value in self._connections:
+                QMessageBox.warning(self, "警告", f"连接ID '{new_value}' 已存在")
+                self.table_conn.blockSignals(True)
+                self._refresh_conn_table()
+                self.table_conn.blockSignals(False)
+                return
+            worker_conn = self.worker._connections.pop(conn_id, None)
+            if worker_conn:
+                self.worker._connections[new_value] = worker_conn
+            self._connections[new_value] = self._connections.pop(conn_id)
+            self.table_conn.blockSignals(True)
+            self._refresh_conn_table()
+            self.table_conn.blockSignals(False)
+            self.status_bar.showMessage(f"连接ID已修改为: {new_value}", 3000)
+        elif col == 1:
+            conn_type = new_value.lower()
+            if conn_type not in ["modbus_tcp", "modbus_rtu", "keyence"]:
+                QMessageBox.warning(self, "警告", f"不支持的连接类型: {new_value}")
+                self.table_conn.blockSignals(True)
+                self._refresh_conn_table()
+                self.table_conn.blockSignals(False)
+                return
+            self._connections[conn_id]["type"] = conn_type
+            self.table_conn.blockSignals(True)
+            self._refresh_conn_table()
+            self.table_conn.blockSignals(False)
+            self.status_bar.showMessage(f"连接类型已修改为: {new_value}", 3000)
+        elif col == 2:
+            info = self._connections[conn_id]
+            worker_conn = self.worker._connections.get(conn_id)
+            if info["type"] == "modbus_rtu":
+                info["params"]["port"] = new_value
+                if worker_conn:
+                    worker_conn["connector"].port = new_value
+            else:
+                info["params"]["host"] = new_value
+                if worker_conn:
+                    worker_conn["connector"].host = new_value
+            self.table_conn.blockSignals(True)
+            self._refresh_conn_table()
+            self.table_conn.blockSignals(False)
+        elif col == 3:
+            info = self._connections[conn_id]
+            try:
+                val = int(new_value)
+                if info["type"] == "modbus_rtu":
+                    info["params"]["baudrate"] = val
+                    worker_conn = self.worker._connections.get(conn_id)
+                    if worker_conn:
+                        worker_conn["connector"].baudrate = val
+                else:
+                    info["params"]["port"] = val
+                    worker_conn = self.worker._connections.get(conn_id)
+                    if worker_conn:
+                        worker_conn["connector"].port = val
+                self.table_conn.blockSignals(True)
+                self._refresh_conn_table()
+                self.table_conn.blockSignals(False)
+            except ValueError:
+                QMessageBox.warning(self, "警告", "端口/波特率必须为整数")
+                self.table_conn.blockSignals(True)
+                self._refresh_conn_table()
+                self.table_conn.blockSignals(False)
 
     # ---- 任务管理 ----
     def _on_add_task(self):
@@ -1482,6 +1564,102 @@ class MainWindow(QMainWindow):
         self._refresh_task_table()
         self._ensure_chart_for_task(task)
         self.status_bar.showMessage(f"已添加采集任务: {task.channel_name}", 3000)
+
+    def _on_task_cell_changed(self, row, col):
+        if row < 0 or row >= len(self._tasks):
+            return
+        task = self._tasks[row]
+        new_value = self.table_task.item(row, col).text().strip()
+        
+        if col == 0:
+            if new_value not in self._connections:
+                QMessageBox.warning(self, "警告", f"连接ID '{new_value}' 不存在")
+                self.table_task.blockSignals(True)
+                self._refresh_task_table()
+                self.table_task.blockSignals(False)
+                return
+            task.connection_id = new_value
+            task.connection_type = self._connections[new_value]["type"]
+            self.table_task.blockSignals(True)
+            self._refresh_task_table()
+            self.table_task.blockSignals(False)
+            self.status_bar.showMessage(f"任务连接已修改为: {new_value}", 3000)
+        elif col == 1:
+            conn_type = new_value.lower()
+            if conn_type not in ["modbus_tcp", "modbus_rtu", "keyence"]:
+                QMessageBox.warning(self, "警告", f"不支持的连接类型: {new_value}")
+                self.table_task.blockSignals(True)
+                self._refresh_task_table()
+                self.table_task.blockSignals(False)
+                return
+            task.connection_type = conn_type
+            self.table_task.blockSignals(True)
+            self._refresh_task_table()
+            self.table_task.blockSignals(False)
+        elif col == 2:
+            task.device_type = new_value
+            self.table_task.blockSignals(True)
+            self._refresh_task_table()
+            self.table_task.blockSignals(False)
+        elif col == 3:
+            try:
+                task.start_addr = int(new_value)
+                self.table_task.blockSignals(True)
+                self._refresh_task_table()
+                self.table_task.blockSignals(False)
+            except ValueError:
+                QMessageBox.warning(self, "警告", "起始地址必须为整数")
+                self.table_task.blockSignals(True)
+                self._refresh_task_table()
+                self.table_task.blockSignals(False)
+        elif col == 4:
+            try:
+                qty = int(new_value)
+                if qty < 1 or qty > 125:
+                    QMessageBox.warning(self, "警告", "读取数量必须在 1-125 之间")
+                    self.table_task.blockSignals(True)
+                    self._refresh_task_table()
+                    self.table_task.blockSignals(False)
+                    return
+                task.quantity = qty
+                self.table_task.blockSignals(True)
+                self._refresh_task_table()
+                self.table_task.blockSignals(False)
+            except ValueError:
+                QMessageBox.warning(self, "警告", "读取数量必须为整数")
+                self.table_task.blockSignals(True)
+                self._refresh_task_table()
+                self.table_task.blockSignals(False)
+        elif col == 5:
+            QMessageBox.warning(self, "提示", "通道前缀不可编辑，请删除任务后重新添加")
+            self.table_task.blockSignals(True)
+            self._refresh_task_table()
+            self.table_task.blockSignals(False)
+        elif col == 6:
+            if not new_value:
+                QMessageBox.warning(self, "警告", "通道名称不能为空")
+                self.table_task.blockSignals(True)
+                self._refresh_task_table()
+                self.table_task.blockSignals(False)
+                return
+            old_name = task.channel_name
+            task.channel_name = new_value
+            self.table_task.blockSignals(True)
+            self._refresh_task_table()
+            self.table_task.blockSignals(False)
+            self._update_chart_for_task(task)
+            self.status_bar.showMessage(f"通道名称已修改: {old_name} -> {new_value}", 3000)
+        elif col == 7:
+            task.unit = new_value
+            self.table_task.blockSignals(True)
+            self._refresh_task_table()
+            self.table_task.blockSignals(False)
+
+    def _update_chart_for_task(self, task):
+        chart_id = task.task_id
+        if chart_id in self._chart_widgets:
+            chart = self._chart_widgets[chart_id]
+            chart.setTitle(task.channel_name)
 
     def _ensure_chart_for_task(self, task):
         self._placeholder_label.setVisible(False)
@@ -1572,6 +1750,7 @@ class MainWindow(QMainWindow):
             f"活跃连接: {active}/{len(self._connections)}")
 
     def _refresh_conn_table(self):
+        self.table_conn.blockSignals(True)
         self.table_conn.setRowCount(len(self._connections))
         for i, (cid, info) in enumerate(self._connections.items()):
             p = info["params"]
@@ -1594,9 +1773,13 @@ class MainWindow(QMainWindow):
                 status = "🟢 连接中" if conn_obj["connector"].is_connected() else "⚪ 未连接"
             else:
                 status = "⚪ 未连接"
-            self.table_conn.setItem(i, 4, QTableWidgetItem(status))
+            status_item = QTableWidgetItem(status)
+            status_item.setFlags(status_item.flags() & ~Qt.ItemIsEditable)
+            self.table_conn.setItem(i, 4, status_item)
+        self.table_conn.blockSignals(False)
 
     def _refresh_task_table(self):
+        self.table_task.blockSignals(True)
         self.table_task.setRowCount(len(self._tasks))
         for i, task in enumerate(self._tasks):
             self.table_task.setItem(i, 0, QTableWidgetItem(task.connection_id))
@@ -1607,6 +1790,7 @@ class MainWindow(QMainWindow):
             self.table_task.setItem(i, 5, QTableWidgetItem(task.channel_prefix))
             self.table_task.setItem(i, 6, QTableWidgetItem(task.channel_name))
             self.table_task.setItem(i, 7, QTableWidgetItem(task.unit))
+        self.table_task.blockSignals(False)
 
     # ---- 配置持久化 ----
     def _save_config(self):
@@ -1674,21 +1858,21 @@ def main():
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
 
-    # Catppuccin Mocha 暗色主题
+    # Catppuccin Latte 亮色主题
     palette = app.palette()
-    palette.setColor(palette.ColorRole.Window, QColor("#1e1e2e"))
-    palette.setColor(palette.ColorRole.WindowText, QColor("#cdd6f4"))
-    palette.setColor(palette.ColorRole.Base, QColor("#313244"))
-    palette.setColor(palette.ColorRole.AlternateBase, QColor("#1e1e2e"))
-    palette.setColor(palette.ColorRole.Text, QColor("#cdd6f4"))
-    palette.setColor(palette.ColorRole.Button, QColor("#45475a"))
-    palette.setColor(palette.ColorRole.ButtonText, QColor("#cdd6f4"))
-    palette.setColor(palette.ColorRole.Highlight, QColor("#585b70"))
-    palette.setColor(palette.ColorRole.HighlightedText, QColor("#cdd6f4"))
+    palette.setColor(palette.ColorRole.Window, QColor("#eff1f5"))
+    palette.setColor(palette.ColorRole.WindowText, QColor("#4c4f69"))
+    palette.setColor(palette.ColorRole.Base, QColor("#e6e9ef"))
+    palette.setColor(palette.ColorRole.AlternateBase, QColor("#eff1f5"))
+    palette.setColor(palette.ColorRole.Text, QColor("#4c4f69"))
+    palette.setColor(palette.ColorRole.Button, QColor("#dce0e8"))
+    palette.setColor(palette.ColorRole.ButtonText, QColor("#4c4f69"))
+    palette.setColor(palette.ColorRole.Highlight, QColor("#bcc0cc"))
+    palette.setColor(palette.ColorRole.HighlightedText, QColor("#4c4f69"))
     app.setPalette(palette)
 
-    pg.setConfigOption("background", "#1e1e2e")
-    pg.setConfigOption("foreground", "#cdd6f4")
+    pg.setConfigOption("background", "#eff1f5")
+    pg.setConfigOption("foreground", "#4c4f69")
 
     window = MainWindow()
     window.show()

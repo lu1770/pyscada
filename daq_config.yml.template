@@ -1,84 +1,158 @@
-connections:
-  keyence_plc1:
-    params:
-      host: 192.168.1.200
-      port: 3000
-      unit: 0
-    type: keyence
-  modbus_rtu_device1:
-    params:
-      baudrate: 9600
-      bytesize: 8
-      parity: N
-      port: COM1
-      slave_id: 1
-      stopbits: 1
-    type: modbus_rtu
-  modbus_tcp_device1:
-    params:
-      host: 192.168.1.100
-      port: 502
-      slave_id: 1
-    type: modbus_tcp
+# ================================================================
+# 多通道工业数据采集系统 - 配置文件模板
+# 支持设备: Modbus TCP / Modbus RTU / Keyence PLC
+# ================================================================
+
+# ---------------------------
+# 全局配置
+# ---------------------------
+# 采集间隔（秒），控制轮询频率
 poll_interval: 0.5
+
+
+# ---------------------------
+# 设备连接配置
+# ---------------------------
+# 定义所有需要连接的设备
+# 支持的连接类型: modbus_tcp, modbus_rtu, keyence
+connections:
+  # Keyence PLC 示例
+  keyence_plc1:
+    # 连接类型: keyence
+    type: keyence
+    params:
+      # PLC 主机IP地址
+      host: 192.168.1.200
+      # Keyence 协议端口（通常为3000）
+      port: 3000
+      # PLC单元号（通常为0）
+      unit: 0
+
+  # Modbus RTU 设备示例（串口）
+  modbus_rtu_device1:
+    # 连接类型: modbus_rtu
+    type: modbus_rtu
+    params:
+      # 串口名称（Windows: COM1, COM2...; Linux: /dev/ttyUSB0...）
+      port: COM1
+      # 波特率（常用: 9600, 19200, 38400, 57600, 115200）
+      baudrate: 9600
+      # 数据位（通常为8）
+      bytesize: 8
+      # 校验位（N: 无校验, E: 偶校验, O: 奇校验）
+      parity: N
+      # 停止位（通常为1）
+      stopbits: 1
+      # 从站地址（1-247）
+      slave_id: 1
+
+  # Modbus TCP 设备示例（以太网）
+  modbus_tcp_device1:
+    # 连接类型: modbus_tcp
+    type: modbus_tcp
+    params:
+      # 设备IP地址
+      host: 192.168.1.100
+      # Modbus TCP端口（标准为502）
+      port: 502
+      # 从站地址（1-247）
+      slave_id: 1
+
+
+# ---------------------------
+# 采集任务配置
+# ---------------------------
+# 定义所有需要采集的数据点
+# 每个任务对应一个图表，可包含多个通道
 tasks:
-- channel_name: 温度传感器
-  channel_prefix: temp
-  connection_id: modbus_tcp_device1
-  connection_type: modbus_tcp
-  data_type: uint16
-  device_type: holding
-  offset: 0
-  quantity: 4
-  scale: 0.1
-  start_addr: 0
-  task_id: task_temp_sensor
-  unit: °C
-- channel_name: 压力变送器
-  channel_prefix: pressure
-  connection_id: modbus_tcp_device1
-  connection_type: modbus_tcp
-  data_type: uint16
-  device_type: input
-  offset: 0
-  quantity: 2
-  scale: 0.001
-  start_addr: 100
-  task_id: task_pressure
-  unit: MPa
-- channel_name: 数字输入
-  channel_prefix: di
-  connection_id: modbus_tcp_device1
-  connection_type: modbus_tcp
-  data_type: uint16
-  device_type: coil
-  offset: 0
-  quantity: 8
-  scale: 1.0
-  start_addr: 0
-  task_id: task_digital_input
-  unit: ''
-- channel_name: DM寄存器
-  channel_prefix: keyence_dm
-  connection_id: keyence_plc1
-  connection_type: keyence
-  data_type: uint16
-  device_type: DM
-  offset: 0
-  quantity: 10
-  scale: 1.0
-  start_addr: 0
-  task_id: task_keyence_dm
-  unit: ''
-- channel_name: 温度
-  channel_prefix: temp
-  connection_id: modbus_tcp_device1
-  connection_type: modbus_tcp
-  data_type: uint16
-  device_type: holding
-  offset: 0.0
-  quantity: 1
-  scale: 1.0
-  start_addr: 0
-  task_id: task_1785122636361
-  unit: ''
+# ====================
+# 字段说明:
+#   task_id:         任务唯一标识（不能重复）
+#   connection_id:   关联的连接名称（需在connections中定义）
+#   connection_type: 连接类型（modbus_tcp/modbus_rtu/keyence）
+#   device_type:     寄存器类型
+#                    - modbus: holding(保持寄存器), input(输入寄存器),
+#                              coil(线圈), discrete_input(离散输入)
+#                    - keyence: DM(数据寄存器)
+#   start_addr:      起始地址（寄存器编号）
+#   quantity:        采集数量（连续寄存器个数）
+#   data_type:       数据类型
+#                    - uint16:  无符号16位整数（占1个寄存器）
+#                    - int16:   有符号16位整数（占1个寄存器）
+#                    - uint32:  无符号32位整数（占2个寄存器）
+#                    - int32:   有符号32位整数（占2个寄存器）
+#                    - float32: 单精度浮点数（占2个寄存器）
+#                    - uint64:  无符号64位整数（占4个寄存器）
+#                    - int64:   有符号64位整数（占4个寄存器）
+#                    - float64: 双精度浮点数（占4个寄存器）
+#   byte_order:      字节序（多字节类型适用）
+#                    - abcd: 大端序（默认，网络字节序）
+#                    - dcba: 小端序
+#                    - badc: 字交换（AB-CD -> BA-DC）
+#                    - cdab: 字交换（AB-CD -> CD-AB）
+#   channel_prefix:  通道ID前缀，生成格式: prefix_addr
+#   channel_name:    通道显示名称（图表标题）
+#   unit:            单位（如°C, MPa, %等）
+#   scale:           缩放因子（工程值 = 原始值 × scale + offset）
+#   offset:          偏移量（工程值 = 原始值 × scale + offset）
+# ====================
+
+  # 示例1: 温度传感器（读取4个连续保持寄存器）
+  - task_id: task_temp_sensor
+    connection_id: modbus_tcp_device1
+    connection_type: modbus_tcp
+    device_type: holding
+    start_addr: 0
+    quantity: 4
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: temp
+    channel_name: 温度传感器
+    unit: °C
+    scale: 0.1
+    offset: 0
+
+  # 示例2: 压力变送器（读取2个连续输入寄存器）
+  - task_id: task_pressure
+    connection_id: modbus_tcp_device1
+    connection_type: modbus_tcp
+    device_type: input
+    start_addr: 100
+    quantity: 2
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: pressure
+    channel_name: 压力变送器
+    unit: MPa
+    scale: 0.001
+    offset: 0
+
+  # 示例3: 数字输入（读取8个线圈）
+  - task_id: task_digital_input
+    connection_id: modbus_tcp_device1
+    connection_type: modbus_tcp
+    device_type: coil
+    start_addr: 0
+    quantity: 8
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: di
+    channel_name: 数字输入
+    unit: ''
+    scale: 1.0
+    offset: 0
+
+  # 示例4: Keyence PLC DM寄存器（读取10个寄存器）
+  - task_id: task_keyence_dm
+    connection_id: keyence_plc1
+    connection_type: keyence
+    device_type: DM
+    start_addr: 0
+    quantity: 10
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: keyence_dm
+    channel_name: DM寄存器
+    unit: ''
+    scale: 1.0
+    offset: 0
