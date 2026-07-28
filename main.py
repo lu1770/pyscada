@@ -666,7 +666,226 @@ class ModbusRTUConnector:
 
 
 # ================================================================
-#  第四部分: 基恩士(Keyence) PLC 连接器
+#  第四部分: Modbus ASCII 连接器 (串口实现)
+# ================================================================
+class ModbusASCIIConnector:
+    """Modbus ASCII 连接器 — 使用 pyserial 实现串口通信"""
+
+    FUNC_READ_HOLDING   = 0x03
+    FUNC_READ_INPUT_REG = 0x04
+    FUNC_READ_COILS     = 0x01
+
+    def __init__(self, connection_id: str, port: str = "COM1",
+                 baudrate: int = 9600, slave_id: int = 1,
+                 timeout: float = 3.0, parity: str = "N",
+                 stopbits: int = 1, bytesize: int = 7):
+        self.connection_id = connection_id
+        self.port = port
+        self.baudrate = baudrate
+        self.slave_id = slave_id
+        self.timeout = timeout
+        self.parity = parity
+        self.stopbits = stopbits
+        self.bytesize = bytesize
+        self._ser = None
+        self._lock = threading.Lock()
+
+    def _calc_lrc(self, data: bytes) -> int:
+        lrc = 0
+        for byte in data:
+            lrc = (lrc + byte) & 0xFF
+        lrc = (~lrc + 1) & 0xFF
+        return lrc
+
+    def _build_frame(self, func_code: int, start_addr: int, quantity: int) -> bytes:
+        pdu = struct.pack(">BBHH", self.slave_id, func_code, start_addr, quantity)
+        lrc = self._calc_lrc(pdu)
+        hex_str = ":" + pdu.hex().upper() + f"{lrc:02X}" + "\r\n"
+        return hex_str.encode("ascii")
+
+    def _validate_frame(self, frame: str) -> bool:
+        if not frame.startswith(":") or not frame.endswith("\r\n"):
+            return False
+        hex_data = frame[1:-2]
+        if len(hex_data) % 2 != 0:
+            return False
+        try:
+            raw_bytes = bytes.fromhex(hex_data)
+        except ValueError:
+            return False
+        if len(raw_bytes) < 4:
+            return False
+        data = raw_bytes[:-1]
+        received_lrc = raw_bytes[-1]
+        expected_lrc = self._calc_lrc(data)
+        return received_lrc == expected_lrc
+
+    def _hex_to_bytes(self, hex_str: str) -> Optional[bytes]:
+        try:
+            return bytes.fromhex(hex_str)
+        except ValueError:
+            return None
+
+    def connect(self) -> bool:
+        if serial is None:
+            print(f"[Modbus ASCII] 连接失败 {self.port} -> 缺少 pyserial 依赖，请安装: pip install pyserial")
+            return False
+        try:
+            self._ser = serial.Serial(
+                port=self.port,
+                baudrate=self.baudrate,
+                parity=self.parity,
+                stopbits=self.stopbits,
+                bytesize=self.bytesize,
+                timeout=self.timeout,
+                write_timeout=self.timeout
+            )
+            return True
+        except Exception as e:
+            print(f"[Modbus ASCII] 连接失败 {self.port} -> {e}")
+            self._ser = None
+            return False
+
+    def disconnect(self):
+        if self._ser:
+            try:
+                self._ser.close()
+            except Exception:
+                pass
+            self._ser = None
+
+    def is_connected(self) -> bool:
+        return self._ser is not None and self._ser.is_open
+
+    def _send_request(self, func_code: int, start_addr: int,
+                      quantity: int) -> Optional[bytes]:
+        if not self._ser or not self._ser.is_open:
+            return None
+        with self._lock:
+            try:
+                frame = self._build_frame(func_code, start_addr, quantity)
+                self._ser.flushInput()
+                self._ser.write(frame)
+                self._ser.flush()
+                return self._recv_response()
+            except Exception as e:
+                print(f"[Modbus ASCII] 通信错误: {e}")
+                self.disconnect()
+                return None
+
+    def _recv_response(self) -> Optional[bytes]:
+        try:
+            time.sleep(0.05)
+            resp = b""
+            start_time = time.time()
+            timeout = self.timeout
+            while True:
+                if self._ser.in_waiting > 0:
+                    chunk = self._ser.read(self._ser.in_waiting)
+                    resp += chunk
+                    if b"\r\n" in resp:
+                        break
+                else:
+                    time.sleep(0.05)
+                    if len(resp) > 0 and self._ser.in_waiting == 0:
+                        break
+                elapsed = time.time() - start_time
+                if elapsed >= timeout:
+                    break
+            if len(resp) < 10:
+                return None
+            resp_str = resp.decode("ascii", errors="replace")
+            if not self._validate_frame(resp_str):
+                return None
+            hex_data = resp_str[1:-2]
+            raw_bytes = self._hex_to_bytes(hex_data)
+            if raw_bytes is None:
+                return None
+            return raw_bytes[:-1]
+        except Exception:
+            return None
+
+    def read_holding_registers(self, start_addr: int, quantity: int):
+        resp = self._send_request(self.FUNC_READ_HOLDING, start_addr, quantity)
+        if resp is None:
+            return None
+        return self._parse_register_response(resp)
+
+    def read_input_registers(self, start_addr: int, quantity: int):
+        resp = self._send_request(self.FUNC_READ_INPUT_REG, start_addr, quantity)
+        if resp is None:
+            return None
+        return self._parse_register_response(resp)
+
+    def read_coils(self, start_addr: int, quantity: int):
+        resp = self._send_request(self.FUNC_READ_COILS, start_addr, quantity)
+        if resp is None:
+            return None
+        return self._parse_bit_response(resp, quantity)
+
+    def read_holding_registers_raw(self, start_addr: int, quantity: int) -> Optional[bytes]:
+        resp = self._send_request(self.FUNC_READ_HOLDING, start_addr, quantity)
+        if resp is None:
+            return None
+        return self._extract_raw_register_data(resp)
+
+    def read_input_registers_raw(self, start_addr: int, quantity: int) -> Optional[bytes]:
+        resp = self._send_request(self.FUNC_READ_INPUT_REG, start_addr, quantity)
+        if resp is None:
+            return None
+        return self._extract_raw_register_data(resp)
+
+    def _extract_raw_register_data(self, resp: bytes) -> Optional[bytes]:
+        if len(resp) < 5:
+            return None
+        func_code = resp[1]
+        if func_code & 0x80:
+            exc_code = resp[2] if len(resp) > 2 else -1
+            print(f"[Modbus ASCII] 异常响应: func={func_code:#x}, exc={exc_code}")
+            return None
+        byte_count = resp[2]
+        return resp[3:3 + byte_count]
+
+    def _parse_register_response(self, resp: bytes):
+        if len(resp) < 5:
+            return None
+        func_code = resp[1]
+        if func_code & 0x80:
+            exc_code = resp[2] if len(resp) > 2 else -1
+            print(f"[Modbus ASCII] 异常响应: func={func_code:#x}, exc={exc_code}")
+            return None
+        byte_count = resp[2]
+        reg_data = resp[3:3 + byte_count]
+        values = []
+        for i in range(0, len(reg_data), 2):
+            chunk = reg_data[i:i + 2]
+            if len(chunk) == 2:
+                values.append(struct.unpack(">H", chunk)[0])
+            elif len(chunk) == 1:
+                values.append(chunk[0])
+        return values
+
+    def _parse_bit_response(self, resp: bytes, quantity: int):
+        if len(resp) < 5:
+            return None
+        func_code = resp[1]
+        if func_code & 0x80:
+            return None
+        byte_count = resp[2]
+        bit_data = resp[3:3 + byte_count]
+        values = []
+        for i in range(quantity):
+            byte_idx = i // 8
+            bit_idx = i % 8
+            if byte_idx < len(bit_data):
+                values.append((bit_data[byte_idx] >> bit_idx) & 0x01)
+            else:
+                values.append(0)
+        return values
+
+
+# ================================================================
+#  第五部分: 基恩士(Keyence) PLC 连接器
 # ================================================================
 class KeyencePLCConnector:
     """
@@ -854,6 +1073,8 @@ class AcquisitionWorker(QObject):
             conn = ModbusTCPConnector(conn_id, **kwargs)
         elif conn_type == "modbus_rtu":
             conn = ModbusRTUConnector(conn_id, **kwargs)
+        elif conn_type == "modbus_ascii":
+            conn = ModbusASCIIConnector(conn_id, **kwargs)
         elif conn_type == "keyence":
             conn = KeyencePLCConnector(conn_id, **kwargs)
         else:
@@ -896,7 +1117,7 @@ class AcquisitionWorker(QObject):
         for conn_id, info in self._connections.items():
             connector = info["connector"]
             ok = connector.connect()
-            if isinstance(connector, ModbusRTUConnector):
+            if isinstance(connector, ModbusRTUConnector) or isinstance(connector, ModbusASCIIConnector):
                 conn_info = f"{connector.port} @ {connector.baudrate}"
             else:
                 conn_info = f"{connector.host}:{connector.port}"
@@ -939,7 +1160,7 @@ class AcquisitionWorker(QObject):
             self.connection_status.emit(conn_id, False, "已断开")
 
     def _poll_one(self, connector, task: PollingTask):
-        if isinstance(connector, ModbusTCPConnector) or isinstance(connector, ModbusRTUConnector):
+        if isinstance(connector, ModbusTCPConnector) or isinstance(connector, ModbusRTUConnector) or isinstance(connector, ModbusASCIIConnector):
             if task.device_type == "coil":
                 return connector.read_coils(task.start_addr, task.quantity)
             else:
@@ -1021,7 +1242,7 @@ class ConnectionConfigDialog(QWidget):
 
         layout.addWidget(QLabel("连接类型:"), 0, 0)
         self.cmb_type = QComboBox()
-        self.cmb_type.addItems(["Modbus TCP", "Modbus RTU", "Keyence PLC"])
+        self.cmb_type.addItems(["Modbus TCP", "Modbus RTU", "Modbus ASCII", "Keyence PLC"])
         layout.addWidget(self.cmb_type, 0, 1)
 
         layout.addWidget(QLabel("连接ID:"), 1, 0)
@@ -1095,26 +1316,29 @@ class ConnectionConfigDialog(QWidget):
         conn_type = self.cmb_type.currentText()
         is_modbus_tcp = conn_type == "Modbus TCP"
         is_modbus_rtu = conn_type == "Modbus RTU"
+        is_modbus_ascii = conn_type == "Modbus ASCII"
         is_keyence = conn_type == "Keyence PLC"
+
+        is_serial = is_modbus_rtu or is_modbus_ascii
 
         self.lbl_host.setVisible(is_modbus_tcp or is_keyence)
         self.edit_host.setVisible(is_modbus_tcp or is_keyence)
-        self.lbl_serial_port.setVisible(is_modbus_rtu)
-        self.edit_serial_port.setVisible(is_modbus_rtu)
+        self.lbl_serial_port.setVisible(is_serial)
+        self.edit_serial_port.setVisible(is_serial)
 
         self.spin_port.setVisible(is_modbus_tcp or is_keyence)
-        self.lbl_baudrate.setVisible(is_modbus_rtu)
-        self.cmb_baudrate.setVisible(is_modbus_rtu)
+        self.lbl_baudrate.setVisible(is_serial)
+        self.cmb_baudrate.setVisible(is_serial)
 
-        self.lbl_slave.setVisible(is_modbus_tcp or is_modbus_rtu)
-        self.spin_slave.setVisible(is_modbus_tcp or is_modbus_rtu)
+        self.lbl_slave.setVisible(is_modbus_tcp or is_serial)
+        self.spin_slave.setVisible(is_modbus_tcp or is_serial)
         self.lbl_unit.setVisible(is_keyence)
         self.spin_unit.setVisible(is_keyence)
 
-        self.lbl_parity.setVisible(is_modbus_rtu)
-        self.cmb_parity.setVisible(is_modbus_rtu)
-        self.lbl_stopbits.setVisible(is_modbus_rtu)
-        self.spin_stopbits.setVisible(is_modbus_rtu)
+        self.lbl_parity.setVisible(is_serial)
+        self.cmb_parity.setVisible(is_serial)
+        self.lbl_stopbits.setVisible(is_serial)
+        self.spin_stopbits.setVisible(is_serial)
 
         if is_modbus_tcp:
             self.spin_port.setValue(502)
@@ -1144,6 +1368,16 @@ class ConnectionConfigDialog(QWidget):
                 "parity": self.cmb_parity.currentText(),
                 "stopbits": self.spin_stopbits.value(),
                 "bytesize": 8
+            }
+        elif conn_type_text == "Modbus ASCII":
+            conn_type = "modbus_ascii"
+            params = {
+                "port": self.edit_serial_port.text().strip(),
+                "baudrate": int(self.cmb_baudrate.currentText()),
+                "slave_id": self.spin_slave.value(),
+                "parity": self.cmb_parity.currentText(),
+                "stopbits": self.spin_stopbits.value(),
+                "bytesize": 7
             }
         else:
             conn_type = "keyence"
@@ -1179,7 +1413,7 @@ class TaskConfigDialog(QWidget):
             label = f"{cid} ({info['type']})"
             if info['type'] == 'modbus_tcp':
                 label += f" {info['params'].get('host','')}:{info['params'].get('port',502)}"
-            elif info['type'] == 'modbus_rtu':
+            elif info['type'] in ['modbus_rtu', 'modbus_ascii']:
                 label += f" {info['params'].get('port','')} @ {info['params'].get('baudrate',9600)}"
             else:
                 label += f" {info['params'].get('host','')}:{info['params'].get('port',3000)}"
@@ -1305,7 +1539,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("多通道工业数据采集系统 — Modbus TCP/RTU / Keyence PLC")
+        self.setWindowTitle("多通道工业数据采集系统 — Modbus TCP/RTU/ASCII / Keyence PLC")
         self.resize(1400, 900)
         self.setMinimumSize(800, 600)
 
@@ -1327,8 +1561,11 @@ class MainWindow(QMainWindow):
         self._status_timer.timeout.connect(self._refresh_status)
         self._status_timer.start(1000)
 
-        self._config_file = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "daq_config.yml")
+        if getattr(sys, 'frozen', False):
+            app_dir = os.path.dirname(sys.executable)
+        else:
+            app_dir = os.path.dirname(os.path.abspath(__file__))
+        self._config_file = os.path.join(app_dir, "daq_config.yml")
         self._load_config()
 
     def _build_ui(self):
@@ -1419,7 +1656,7 @@ class MainWindow(QMainWindow):
         self._placeholder_label = QLabel(
             "📝 请添加连接和采集任务后开始采集\n\n"
             "使用步骤:\n"
-            "  1. 点击「添加连接」配置 Modbus TCP/RTU / Keyence 设备\n"
+            "  1. 点击「添加连接」配置 Modbus TCP/RTU/ASCII / Keyence 设备\n"
             "  2. 点击「添加采集任务」配置要读取的寄存器/区域\n"
             "  3. 点击「开始采集」启动实时数据采集\n"
             "  4. 点击「导出CSV」全量导出所有数据"
@@ -1500,7 +1737,7 @@ class MainWindow(QMainWindow):
             self.status_bar.showMessage(f"连接ID已修改为: {new_value}", 3000)
         elif col == 1:
             conn_type = new_value.lower()
-            if conn_type not in ["modbus_tcp", "modbus_rtu", "keyence"]:
+            if conn_type not in ["modbus_tcp", "modbus_rtu", "modbus_ascii", "keyence"]:
                 QMessageBox.warning(self, "警告", f"不支持的连接类型: {new_value}")
                 self.table_conn.blockSignals(True)
                 self._refresh_conn_table()
@@ -1514,7 +1751,7 @@ class MainWindow(QMainWindow):
         elif col == 2:
             info = self._connections[conn_id]
             worker_conn = self.worker._connections.get(conn_id)
-            if info["type"] == "modbus_rtu":
+            if info["type"] in ["modbus_rtu", "modbus_ascii"]:
                 info["params"]["port"] = new_value
                 if worker_conn:
                     worker_conn["connector"].port = new_value
@@ -1529,7 +1766,7 @@ class MainWindow(QMainWindow):
             info = self._connections[conn_id]
             try:
                 val = int(new_value)
-                if info["type"] == "modbus_rtu":
+                if info["type"] in ["modbus_rtu", "modbus_ascii"]:
                     info["params"]["baudrate"] = val
                     worker_conn = self.worker._connections.get(conn_id)
                     if worker_conn:
@@ -1586,7 +1823,7 @@ class MainWindow(QMainWindow):
             self.status_bar.showMessage(f"任务连接已修改为: {new_value}", 3000)
         elif col == 1:
             conn_type = new_value.lower()
-            if conn_type not in ["modbus_tcp", "modbus_rtu", "keyence"]:
+            if conn_type not in ["modbus_tcp", "modbus_rtu", "modbus_ascii", "keyence"]:
                 QMessageBox.warning(self, "警告", f"不支持的连接类型: {new_value}")
                 self.table_task.blockSignals(True)
                 self._refresh_task_table()
@@ -1758,7 +1995,7 @@ class MainWindow(QMainWindow):
             conn_type = info["type"]
             self.table_conn.setItem(i, 1, QTableWidgetItem(conn_type))
             
-            if conn_type == "modbus_rtu":
+            if conn_type in ["modbus_rtu", "modbus_ascii"]:
                 host_text = p.get("port", "")
                 port_text = f"{p.get('baudrate', 9600)}"
             else:

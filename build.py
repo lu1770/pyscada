@@ -77,8 +77,10 @@ def main():
         "--name", "DAQ_System",
         "--onefile",
         "--windowed",
-        # "--add-data", "daq_config.yml;.",
-        # "--add-data", "daq_config.yml.template;.",
+        "--add-data", "daq_config.yml;.",
+        "--add-data", "daq_config.yml.template;.",
+        "--add-data", "daq_config.dte.yml;.",
+        "--add-data", "daq_config.dtm.yml;.",
         "--hidden-import", "yaml",
         "--hidden-import", "serial",
         "--hidden-import", "pyqtgraph",
@@ -97,12 +99,12 @@ def main():
 
     print("\n[4/4] 复制配置文件到输出目录...")
     dist_dir = os.path.join("dist")
-    # for file_name in ["daq_config.yml", "daq_config.yml.template"]:
-    #     src = file_name
-    #     dst = os.path.join(dist_dir, file_name)
-    #     if os.path.exists(src):
-    #         shutil.copy2(src, dst)
-    #         print(f"      ✓ 已复制 {file_name}")
+    for file_name in ["daq_config.yml", "daq_config.yml.template", "daq_config.dte.yml", "daq_config.dtm.yml"]:
+        src = file_name
+        dst = os.path.join(dist_dir, file_name)
+        if os.path.exists(src):
+            shutil.copy2(src, dst)
+            print(f"      ✓ 已复制 {file_name}")
 
     print("\n" + "=" * 60)
     print("打包完成!")
