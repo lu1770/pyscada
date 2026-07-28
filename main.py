@@ -1600,6 +1600,11 @@ class MainWindow(QMainWindow):
         self._config_file = os.path.join(app_dir, "daq_config.yml")
         self._load_config()
 
+        # 软件启动时自动开始采集（如果已配置采集任务）
+        if self._tasks:
+            self._on_start()
+            self.status_bar.showMessage("已自动开始采集", 3000)
+
     def _build_ui(self):
         central = QWidget()
         self.setCentralWidget(central)
