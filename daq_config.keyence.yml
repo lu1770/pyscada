@@ -1,0 +1,23 @@
+connections:
+  keyence_plc1:
+    type: keyence
+    params:
+      host: 192.168.2.40
+      port: 8501
+      unit: 0
+
+poll_interval: 1
+tasks:
+  - task_id: task_keyence_dm
+    connection_id: keyence_plc1
+    connection_type: keyence
+    device_type: DM
+    start_addr: 6000
+    quantity: 10
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: keyence_dm
+    channel_name: 压机当前位置
+    unit: ''
+    scale: 1.0
+    offset: 0

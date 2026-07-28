@@ -892,7 +892,25 @@ class KeyencePLCConnector:
     基恩士 PLC 上位链接协议连接器
     适用型号: KV-5500/7500/8000/Nano 等
     默认端口: 3000 (以太网上位链接)
+
+    数据类型后缀说明:
+    - .U:  无符号16位整数（默认，占1个寄存器）
+    - .S:  有符号16位整数（占1个寄存器）
+    - .UD: 无符号32位整数（占2个寄存器）
+    - .D:  有符号32位整数（占2个寄存器）
+    - .F:  32位浮点数（占2个寄存器）
     """
+
+    KEYENCE_TYPE_MAP = {
+        "uint16":  ".U",
+        "int16":   ".S",
+        "uint32":  ".UD",
+        "int32":   ".D",
+        "float32": ".F",
+        "uint64":  ".UL",
+        "int64":   ".L",
+        "float64": ".LF",
+    }
 
     def __init__(self, connection_id: str, host: str, port: int = 3000,
                  timeout: float = 3.0, unit: int = 0):
@@ -930,7 +948,7 @@ class KeyencePLCConnector:
         if not self._sock:
             return None
         with self._lock:
-            full_cmd = cmd + "\r"
+            full_cmd = cmd + "\r\n"
             try:
                 self._sock.sendall(full_cmd.encode("ascii"))
                 resp = b""
@@ -950,15 +968,22 @@ class KeyencePLCConnector:
                 self.disconnect()
                 return None
 
-    def read_device(self, device_type: str, start_addr: int, count: int = 1):
+    def read_device(self, device_type: str, start_addr: int, count: int = 1, data_type: str = ""):
         """
         通用设备读取
         device_type: DM / MR / LR / TIM / CNT / VR 等
-        命令格式: <单元号2位>R<设备类型><起始地址6位><读取数量2位>
-        示例:     00RDM00000005  -> 从DM0读取5个寄存器（单元号00）
+        data_type:   数据类型，如 "uint16", "float32" 等，用于生成类型后缀
+        命令格式: RD <设备类型><起始地址>.<数据类型后缀>[ <数量>]
+        示例:     RD DM6000.U      -> 从DM6000读取1个无符号16位值
+                  RD DM300.U 5     -> 从DM300读取5个无符号16位值
+                  RD DM300.F       -> 从DM300读取1个float32值
         """
         dt = device_type.upper()[:3]
-        cmd = f"{self.unit:02d}R{dt}{start_addr:06d}{count:02d}"
+        type_suffix = self.KEYENCE_TYPE_MAP.get(data_type.lower(), ".U")
+        if count == 1:
+            cmd = f"RD {dt}{start_addr}{type_suffix}"
+        else:
+            cmd = f"RD {dt}{start_addr}{type_suffix} {count}"
         resp = self._send_command(cmd)
         if resp is None:
             return None
@@ -966,9 +991,16 @@ class KeyencePLCConnector:
             print(f"[Keyence] PLC错误: {resp} (命令: {cmd})")
             return None
         values = resp.split()
+        if not values:
+            return None
+        
         try:
-            return [int(v, 0) for v in values] if values else None
+            if type_suffix in (".F", ".LF", ".D", ".L", ".UD", ".UL"):
+                return [float(v) for v in values]
+            else:
+                return [int(v, 0) for v in values]
         except ValueError:
+            print(f"[Keyence] 响应解析失败: {resp} (命令: {cmd})")
             return None
 
     def read_dm(self, start_addr: int, count: int = 1):
@@ -1180,7 +1212,7 @@ class AcquisitionWorker(QObject):
                     print(f"[ByteOrderDecoder] 解码失败: {e}")
                     return None
         elif isinstance(connector, KeyencePLCConnector):
-            return connector.read_device(task.device_type, task.start_addr, task.quantity)
+            return connector.read_device(task.device_type, task.start_addr, task.quantity, task.data_type)
         return None
 
 
