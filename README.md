@@ -2,7 +2,7 @@
 
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![PySide6](https://img.shields.io/badge/PySide6-6.11.1-green.svg)](https://pypi.org/project/PySide6/)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-GPL%20v3-blue.svg)](LICENSE)
 
 ## 项目简介
 
@@ -164,7 +164,7 @@ pyscada/
 
 ## 许可证
 
-MIT License - 详见 [LICENSE](LICENSE) 文件
+GNU General Public License v3 (GPL-3.0) - 详见 [LICENSE](LICENSE) 文件
 
 ---
 
@@ -246,4 +246,4 @@ Output: `dist/DAQ_System.exe`
 
 ## License
 
-MIT License
+GNU General Public License v3 (GPL-3.0)
