@@ -23,6 +23,7 @@ import json
 import struct
 import socket
 import threading
+import traceback
 from datetime import datetime
 from collections import deque
 from typing import Optional
@@ -47,6 +48,37 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QColor
 import pyqtgraph as pg
+
+
+def _safe_event(func):
+    """事件处理器装饰器：捕获并记录所有异常，防止 UI 崩溃。
+    异常将带完整 traceback 写入日志文件（经 stderr Tee），并弹出提示框。
+    若处理器接收 Qt 事件对象（含 accept 方法），异常时仍调用 accept 以避免阻塞窗口关闭。"""
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception:
+            tb_text = "".join(traceback.format_exc())
+            sys.stderr.write(f"\n[事件异常] {func.__qualname__}:\n{tb_text}\n")
+            try:
+                from PySide6.QtWidgets import QApplication
+                if QApplication.instance() is not None:
+                    QMessageBox.critical(None, "事件处理异常",
+                        f"{func.__qualname__} 发生异常:\n\n{tb_text[-1500:]}")
+            except Exception:
+                pass
+            # 若是 Qt 事件，确保 accept 以免阻塞（如 closeEvent）
+            for a in args[1:]:
+                if hasattr(a, "accept") and callable(getattr(a, "accept")):
+                    try:
+                        a.accept()
+                    except Exception:
+                        pass
+                    break
+    wrapper.__name__ = func.__name__
+    wrapper.__qualname__ = func.__qualname__
+    wrapper.__doc__ = func.__doc__
+    return wrapper
 
 
 # ================================================================
@@ -1344,6 +1376,7 @@ class ConnectionConfigDialog(QWidget):
 
         self.setMinimumWidth(380)
 
+    @_safe_event
     def _on_type_changed(self):
         conn_type = self.cmb_type.currentText()
         is_modbus_tcp = conn_type == "Modbus TCP"
@@ -1377,6 +1410,7 @@ class ConnectionConfigDialog(QWidget):
         elif is_keyence:
             self.spin_port.setValue(3000)
 
+    @_safe_event
     def _on_ok(self):
         conn_id = self.edit_id.text().strip()
         if not conn_id:
@@ -1522,6 +1556,7 @@ class TaskConfigDialog(QWidget):
         btn_layout.addWidget(btn_cancel)
         layout.addLayout(btn_layout, 11, 0, 1, 2)
 
+    @_safe_event
     def _on_conn_changed(self):
         cid = self.cmb_conn.currentData()
         if cid is None:
@@ -1533,6 +1568,7 @@ class TaskConfigDialog(QWidget):
         elif info and info["type"] == "keyence":
             self.cmb_device.addItems(["DM", "MR", "LR", "TIM", "CNT", "VR"])
 
+    @_safe_event
     def _on_ok(self):
         prefix = self.edit_prefix.text().strip()
         name = self.edit_name.text().strip()
@@ -1730,11 +1766,13 @@ class MainWindow(QMainWindow):
         self.table_task.cellChanged.connect(self._on_task_cell_changed)
 
     # ---- 连接管理 ----
+    @_safe_event
     def _on_add_connection(self):
         self._conn_dialog = ConnectionConfigDialog()
         self._conn_dialog.connection_added.connect(self._add_connection)
         self._conn_dialog.show()
 
+    @_safe_event
     def _add_connection(self, conn_id, conn_type, params):
         if conn_id in self._connections:
             QMessageBox.warning(self, "警告", f"连接ID '{conn_id}' 已存在")
@@ -1744,6 +1782,7 @@ class MainWindow(QMainWindow):
         self._refresh_conn_table()
         self.status_bar.showMessage(f"已添加连接: {conn_id}", 3000)
 
+    @_safe_event
     def _on_conn_cell_changed(self, row, col):
         if row < 0 or row >= len(self._connections):
             return
@@ -1823,6 +1862,7 @@ class MainWindow(QMainWindow):
                 self.table_conn.blockSignals(False)
 
     # ---- 任务管理 ----
+    @_safe_event
     def _on_add_task(self):
         if not self._connections:
             QMessageBox.warning(self, "提示", "请先添加至少一个连接")
@@ -1831,6 +1871,7 @@ class MainWindow(QMainWindow):
         self._task_dialog.task_added.connect(self._add_task)
         self._task_dialog.show()
 
+    @_safe_event
     def _add_task(self, task_dict):
         task = PollingTask.from_dict(task_dict)
         self._tasks.append(task)
@@ -1839,6 +1880,7 @@ class MainWindow(QMainWindow):
         self._ensure_chart_for_task(task)
         self.status_bar.showMessage(f"已添加采集任务: {task.channel_name}", 3000)
 
+    @_safe_event
     def _on_task_cell_changed(self, row, col):
         if row < 0 or row >= len(self._tasks):
             return
@@ -1929,12 +1971,14 @@ class MainWindow(QMainWindow):
             self._refresh_task_table()
             self.table_task.blockSignals(False)
 
+    @_safe_event
     def _update_chart_for_task(self, task):
         chart_id = task.task_id
         if chart_id in self._chart_widgets:
             chart = self._chart_widgets[chart_id]
             chart.setTitle(task.channel_name)
 
+    @_safe_event
     def _ensure_chart_for_task(self, task):
         self._placeholder_label.setVisible(False)
         chart_id = task.task_id
@@ -1949,6 +1993,7 @@ class MainWindow(QMainWindow):
                 self._channel_to_chart[cid] = chart_id
 
     # ---- 采集控制 ----
+    @_safe_event
     def _on_start(self):
         if not self._tasks:
             QMessageBox.warning(self, "提示", "请先添加至少一个采集任务")
@@ -1961,6 +2006,7 @@ class MainWindow(QMainWindow):
         self.btn_add_task.setEnabled(False)
         self.status_bar.showMessage("采集已启动", 3000)
 
+    @_safe_event
     def _on_stop(self):
         self.worker.stop()
         self.btn_start.setEnabled(True)
@@ -1970,9 +2016,11 @@ class MainWindow(QMainWindow):
         self.status_bar.showMessage("采集已停止", 3000)
 
     # ---- 事件回调 ----
+    @_safe_event
     def _on_data_acquired(self, channel_id, timestamp, value):
         pass
 
+    @_safe_event
     def _on_conn_status(self, conn_id, connected, message):
         self.status_bar.showMessage(f"[{conn_id}] {message}", 3000)
         self._refresh_conn_table()
@@ -1980,12 +2028,14 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "连接失败",
                 f"设备 [{conn_id}] 连接失败!\n\n{message}\n\n请检查:\n• 设备IP地址和端口是否正确\n• 设备是否已开机\n• 网络是否通畅\n• 防火墙是否允许连接")
 
+    @_safe_event
     def _on_error(self, conn_id, error):
         self.status_bar.showMessage(f"[{conn_id}] 错误: {error}", 5000)
         QMessageBox.warning(self, "通信错误",
             f"设备 [{conn_id}] 通信异常:\n\n{error}")
 
     # ---- 导出/清空 ----
+    @_safe_event
     def _on_export(self):
         if self.store.get_record_count() == 0:
             QMessageBox.information(self, "提示", "暂无数据可导出")
@@ -1998,6 +2048,7 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "导出完成",
                 f"已导出 {count} 条记录到:\n{filepath}")
 
+    @_safe_event
     def _on_clear(self):
         reply = QMessageBox.question(self, "确认", "确定清空所有采集数据?")
         if reply == QMessageBox.Yes:
@@ -2008,6 +2059,7 @@ class MainWindow(QMainWindow):
             self.status_bar.showMessage("数据已清空", 3000)
 
     # ---- 定时刷新 ----
+    @_safe_event
     def _refresh_charts(self):
         for chart_id, chart in self._chart_widgets.items():
             for ch_id, cid in list(self._channel_to_chart.items()):
@@ -2016,6 +2068,7 @@ class MainWindow(QMainWindow):
                     if ts:
                         chart.update_channel(ch_id, ts, vals)
 
+    @_safe_event
     def _refresh_status(self):
         self.lbl_record_count.setText(f"记录数: {self.store.get_record_count()}")
         active = sum(1 for c in self.worker._connections.values()
@@ -2023,6 +2076,7 @@ class MainWindow(QMainWindow):
         self.lbl_active_conn.setText(
             f"活跃连接: {active}/{len(self._connections)}")
 
+    @_safe_event
     def _refresh_conn_table(self):
         self.table_conn.blockSignals(True)
         self.table_conn.setRowCount(len(self._connections))
@@ -2052,6 +2106,7 @@ class MainWindow(QMainWindow):
             self.table_conn.setItem(i, 4, status_item)
         self.table_conn.blockSignals(False)
 
+    @_safe_event
     def _refresh_task_table(self):
         self.table_task.blockSignals(True)
         self.table_task.setRowCount(len(self._tasks))
@@ -2067,6 +2122,7 @@ class MainWindow(QMainWindow):
         self.table_task.blockSignals(False)
 
     # ---- 配置持久化 ----
+    @_safe_event
     def _save_config(self):
         config = {
             "connections": {
@@ -2086,6 +2142,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "错误", f"保存配置失败: {e}")
 
+    @_safe_event
     def _load_config(self):
         if not os.path.exists(self._config_file):
             return
@@ -2117,6 +2174,7 @@ class MainWindow(QMainWindow):
         self._refresh_task_table()
         self.status_bar.showMessage("配置已加载", 3000)
 
+    @_safe_event
     def closeEvent(self, event):
         if self.worker._running:
             self.worker.stop()
@@ -2126,7 +2184,81 @@ class MainWindow(QMainWindow):
 # ================================================================
 #  第九部分: 程序入口
 # ================================================================
+class _TeeStream:
+    """同时写入原流与日志文件的分流器"""
+
+    def __init__(self, original, log_file):
+        self._original = original
+        self._log_file = log_file
+        self._lock = threading.Lock()
+
+    def write(self, text):
+        if not text:
+            return
+        try:
+            self._original.write(text)
+            self._original.flush()
+        except Exception:
+            pass
+        with self._lock:
+            try:
+                self._log_file.write(text)
+                self._log_file.flush()
+            except Exception:
+                pass
+
+    def flush(self):
+        try:
+            self._original.flush()
+        except Exception:
+            pass
+        with self._lock:
+            try:
+                self._log_file.flush()
+            except Exception:
+                pass
+
+    def reconfigure(self, **kwargs):
+        # 兼容 sys.stdout.reconfigure 调用（如 build.py 中的 UTF-8 设置）
+        try:
+            self._original.reconfigure(**kwargs)
+        except Exception:
+            pass
+
+
+def _setup_file_logging():
+    """将 stdout/stderr 同时写入控制台和 logs/ 下的时间戳日志文件，
+    并安装全局异常钩子以捕获未处理异常。"""
+    log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+    os.makedirs(log_dir, exist_ok=True)
+    log_path = os.path.join(log_dir, f"daq_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+
+    try:
+        log_file = open(log_path, "w", encoding="utf-8", buffering=1)
+    except Exception as e:
+        print(f"[警告] 无法创建日志文件: {e}")
+        return
+
+    print(f"[日志] 输出文件: {log_path}")
+    sys.stdout = _TeeStream(sys.stdout, log_file)
+    sys.stderr = _TeeStream(sys.stderr, log_file)
+
+    def _excepthook(exc_type, exc_value, exc_tb):
+        # 先写日志（通过 stderr tee）
+        sys.stderr.write("".join(traceback.format_exception(exc_type, exc_value, exc_tb)))
+        # 同时弹窗提示用户（GUI 环境）
+        try:
+            from PySide6.QtWidgets import QMessageBox
+            tb_text = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+            QMessageBox.critical(None, "未处理的异常", tb_text[-2000:])
+        except Exception:
+            pass
+
+    sys.excepthook = _excepthook
+
+
 def main():
+    _setup_file_logging()
     QApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
     app = QApplication(sys.argv)
