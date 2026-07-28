@@ -954,11 +954,11 @@ class KeyencePLCConnector:
         """
         通用设备读取
         device_type: DM / MR / LR / TIM / CNT / VR 等
-        命令格式: R<设备类型><起始地址6位><读取数量2位>
-        示例:     RDM00000005  -> 从DM0读取5个寄存器
+        命令格式: <单元号2位>R<设备类型><起始地址6位><读取数量2位>
+        示例:     00RDM00000005  -> 从DM0读取5个寄存器（单元号00）
         """
         dt = device_type.upper()[:3]
-        cmd = f"R{dt}{start_addr:06d}{count:02d}"
+        cmd = f"{self.unit:02d}R{dt}{start_addr:06d}{count:02d}"
         resp = self._send_command(cmd)
         if resp is None:
             return None
