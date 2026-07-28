@@ -3,3 +3,6 @@ build/
 DAQ_System.spec
 __pycache__/
 logs/
+.updater_state.json
+DAQ_System.exe
+DAQ_System.exe.tmp
