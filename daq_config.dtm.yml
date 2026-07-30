@@ -280,7 +280,7 @@ write_tasks:
     connection_type: modbus_ascii
     device_type: holding
     start_addr: 0            # H0x000 CH1 SV值
-    value: 250.0             # 25.0°C (原始值 = 25.0 × 10)
+    value: 1950.0             # 25.0°C (原始值 = 25.0 × 10)
     write_interval: 1.0
     data_type: uint16
     byte_order: abcd
@@ -292,7 +292,7 @@ write_tasks:
     connection_type: modbus_ascii
     device_type: holding
     start_addr: 1            # H0x001 CH2 SV值
-    value: 250.0
+    value: 1950.0
     write_interval: 1.0
     data_type: uint16
     byte_order: abcd
@@ -304,7 +304,7 @@ write_tasks:
     connection_type: modbus_ascii
     device_type: holding
     start_addr: 2            # H0x002 CH3 SV值
-    value: 250.0
+    value: 1950.0
     write_interval: 1.0
     data_type: uint16
     byte_order: abcd
@@ -316,7 +316,7 @@ write_tasks:
     connection_type: modbus_ascii
     device_type: holding
     start_addr: 3            # H0x003 CH4 SV值
-    value: 250.0
+    value: 1950.0
     write_interval: 1.0
     data_type: uint16
     byte_order: abcd
@@ -328,7 +328,7 @@ write_tasks:
     connection_type: modbus_ascii
     device_type: holding
     start_addr: 4            # H0x004 CH5 SV值
-    value: 250.0
+    value: 1950.0
     write_interval: 1.0
     data_type: uint16
     byte_order: abcd
@@ -340,7 +340,7 @@ write_tasks:
     connection_type: modbus_ascii
     device_type: holding
     start_addr: 5            # H0x005 CH6 SV值
-    value: 250.0
+    value: 1950.0
     write_interval: 1.0
     data_type: uint16
     byte_order: abcd
@@ -352,7 +352,7 @@ write_tasks:
     connection_type: modbus_ascii
     device_type: holding
     start_addr: 6            # H0x006 CH7 SV值
-    value: 250.0
+    value: 1950.0
     write_interval: 1.0
     data_type: uint16
     byte_order: abcd
@@ -364,7 +364,7 @@ write_tasks:
     connection_type: modbus_ascii
     device_type: holding
     start_addr: 7            # H0x007 CH8 SV值
-    value: 250.0
+    value: 1950.0
     write_interval: 1.0
     data_type: uint16
     byte_order: abcd
