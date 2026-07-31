@@ -29,491 +29,504 @@ connections:
 
 poll_interval: 1
 tasks:
-- byte_order: abcd
-  channel_name: DTE_CH5当前温度
-  channel_prefix: pv_ch5
-  connection_id: delta_dte10t
-  connection_type: modbus_rtu
-  data_type: uint16
-  device_type: holding
-  offset: 0
-  quantity: 1
-  scale: 0.1
-  start_addr: 4100
-  task_id: task_dte_pv_ch5
-  unit: °C
-- byte_order: abcd
-  channel_name: DTE_CH6当前温度
-  channel_prefix: pv_ch6
-  connection_id: delta_dte10t
-  connection_type: modbus_rtu
-  data_type: uint16
-  device_type: holding
-  offset: 0
-  quantity: 1
-  scale: 0.1
-  start_addr: 4101
-  task_id: task_dte_pv_ch6
-  unit: °C
-- byte_order: abcd
-  channel_name: DTE_CH7当前温度
-  channel_prefix: pv_ch7
-  connection_id: delta_dte10t
-  connection_type: modbus_rtu
-  data_type: uint16
-  device_type: holding
-  offset: 0
-  quantity: 1
-  scale: 0.1
-  start_addr: 4102
-  task_id: task_dte_pv_ch7
-  unit: °C
-- byte_order: abcd
-  channel_name: DTE_CH8当前温度
-  channel_prefix: pv_ch8
-  connection_id: delta_dte10t
-  connection_type: modbus_rtu
-  data_type: uint16
-  device_type: holding
-  offset: 0
-  quantity: 1
-  scale: 0.1
-  start_addr: 4103
-  task_id: task_dte_pv_ch8
-  unit: °C
-- byte_order: abcd
-  channel_name: DTE_CH5当前温度
-  channel_prefix: pv_ch5
-  connection_id: delta_dte10t
-  connection_type: modbus_rtu
-  data_type: uint16
-  device_type: holding
-  offset: 0
-  quantity: 1
-  scale: 0.1
-  start_addr: 4100
-  task_id: task_dte_pv_ch5
-  unit: °C
-- byte_order: abcd
-  channel_name: DTE_CH6当前温度
-  channel_prefix: pv_ch6
-  connection_id: delta_dte10t
-  connection_type: modbus_rtu
-  data_type: uint16
-  device_type: holding
-  offset: 0
-  quantity: 1
-  scale: 0.1
-  start_addr: 4101
-  task_id: task_dte_pv_ch6
-  unit: °C
-- byte_order: abcd
-  channel_name: DTE_CH7当前温度
-  channel_prefix: pv_ch7
-  connection_id: delta_dte10t
-  connection_type: modbus_rtu
-  data_type: uint16
-  device_type: holding
-  offset: 0
-  quantity: 1
-  scale: 0.1
-  start_addr: 4102
-  task_id: task_dte_pv_ch7
-  unit: °C
-- byte_order: abcd
-  channel_name: DTE_CH8当前温度
-  channel_prefix: pv_ch8
-  connection_id: delta_dte10t
-  connection_type: modbus_rtu
-  data_type: uint16
-  device_type: holding
-  offset: 0
-  quantity: 1
-  scale: 0.1
-  start_addr: 4103
-  task_id: task_dte_pv_ch8
-  unit: °C
-- byte_order: abcd
-  channel_name: DTE_CH5设定温度
-  channel_prefix: sv_ch5
-  connection_id: delta_dte10t
-  connection_type: modbus_rtu
-  data_type: uint16
-  device_type: holding
-  offset: 0
-  quantity: 1
-  scale: 0.1
-  start_addr: 4108
-  task_id: task_dte_sv_ch5
-  unit: °C
-- byte_order: abcd
-  channel_name: DTE_CH6设定温度
-  channel_prefix: sv_ch6
-  connection_id: delta_dte10t
-  connection_type: modbus_rtu
-  data_type: uint16
-  device_type: holding
-  offset: 0
-  quantity: 1
-  scale: 0.1
-  start_addr: 4109
-  task_id: task_dte_sv_ch6
-  unit: °C
-- byte_order: abcd
-  channel_name: DTE_CH7设定温度
-  channel_prefix: sv_ch7
-  connection_id: delta_dte10t
-  connection_type: modbus_rtu
-  data_type: uint16
-  device_type: holding
-  offset: 0
-  quantity: 1
-  scale: 0.1
-  start_addr: 4110
-  task_id: task_dte_sv_ch7
-  unit: °C
-- byte_order: abcd
-  channel_name: DTE_CH8设定温度
-  channel_prefix: sv_ch8
-  connection_id: delta_dte10t
-  connection_type: modbus_rtu
-  data_type: uint16
-  device_type: holding
-  offset: 0
-  quantity: 1
-  scale: 0.1
-  start_addr: 4111
-  task_id: task_dte_sv_ch8
-  unit: °C
-- byte_order: abcd
-  channel_name: DTE_CH5输出功率1
-  channel_prefix: out1_ch5
-  connection_id: delta_dte10t
-  connection_type: modbus_rtu
-  data_type: uint16
-  device_type: holding
-  offset: 0
-  quantity: 1
-  scale: 0.1
-  start_addr: 4212
-  task_id: task_dte_out1_ch5
-  unit: '%'
-- byte_order: abcd
-  channel_name: DTE_CH6输出功率1
-  channel_prefix: out1_ch6
-  connection_id: delta_dte10t
-  connection_type: modbus_rtu
-  data_type: uint16
-  device_type: holding
-  offset: 0
-  quantity: 1
-  scale: 0.1
-  start_addr: 4213
-  task_id: task_dte_out1_ch6
-  unit: '%'
-- byte_order: abcd
-  channel_name: DTE_CH7输出功率1
-  channel_prefix: out1_ch7
-  connection_id: delta_dte10t
-  connection_type: modbus_rtu
-  data_type: uint16
-  device_type: holding
-  offset: 0
-  quantity: 1
-  scale: 0.1
-  start_addr: 4214
-  task_id: task_dte_out1_ch7
-  unit: '%'
-- byte_order: abcd
-  channel_name: DTE_CH8输出功率1
-  channel_prefix: out1_ch8
-  connection_id: delta_dte10t
-  connection_type: modbus_rtu
-  data_type: uint16
-  device_type: holding
-  offset: 0
-  quantity: 1
-  scale: 0.1
-  start_addr: 4215
-  task_id: task_dte_out1_ch8
-- byte_order: abcd
-  channel_name: DTE_CH5输出功率2
-  channel_prefix: out2_ch5
-  connection_id: delta_dte10t
-  connection_type: modbus_rtu
-  data_type: uint16
-  device_type: holding
-  offset: 0
-  quantity: 1
-  scale: 0.1
-  start_addr: 4220
-  task_id: task_dte_out2_ch5
-  unit: '%'
-- byte_order: abcd
-  channel_name: DTE_CH6输出功率2
-  channel_prefix: out2_ch6
-  connection_id: delta_dte10t
-  connection_type: modbus_rtu
-  data_type: uint16
-  device_type: holding
-  offset: 0
-  quantity: 1
-  scale: 0.1
-  start_addr: 4221
-  task_id: task_dte_out2_ch6
-  unit: '%'
-- byte_order: abcd
-  channel_name: DTE_CH7输出功率2
-  channel_prefix: out2_ch7
-  connection_id: delta_dte10t
-  connection_type: modbus_rtu
-  data_type: uint16
-  device_type: holding
-  offset: 0
-  quantity: 1
-  scale: 0.1
-  start_addr: 4222
-  task_id: task_dte_out2_ch7
-  unit: '%'
-- byte_order: abcd
-  channel_name: DTE_CH8输出功率2
-  channel_prefix: out2_ch8
-  connection_id: delta_dte10t
-  connection_type: modbus_rtu
-  data_type: uint16
-  device_type: holding
-  offset: 0
-  quantity: 1
-  scale: 0.1
-  start_addr: 4223
-  task_id: task_dte_out2_ch8
-  unit: '%'
+  - task_id: task_keyence_dm
+    connection_id: keyence_plc1
+    connection_type: keyence
+    device_type: DM
+    start_addr: 6000
+    quantity: 10
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: keyence_dm
+    channel_name: 压机当前位置
+    unit: ''
+    scale: 1.0
+    offset: 0
+  - byte_order: abcd
+    channel_name: DTE_CH5当前温度
+    channel_prefix: pv_ch5
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4100
+    task_id: task_dte_pv_ch5
+    unit: °C
+  - byte_order: abcd
+    channel_name: DTE_CH6当前温度
+    channel_prefix: pv_ch6
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4101
+    task_id: task_dte_pv_ch6
+    unit: °C
+  - byte_order: abcd
+    channel_name: DTE_CH7当前温度
+    channel_prefix: pv_ch7
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4102
+    task_id: task_dte_pv_ch7
+    unit: °C
+  - byte_order: abcd
+    channel_name: DTE_CH8当前温度
+    channel_prefix: pv_ch8
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4103
+    task_id: task_dte_pv_ch8
+    unit: °C
+  - byte_order: abcd
+    channel_name: DTE_CH5当前温度
+    channel_prefix: pv_ch5
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4100
+    task_id: task_dte_pv_ch5
+    unit: °C
+  - byte_order: abcd
+    channel_name: DTE_CH6当前温度
+    channel_prefix: pv_ch6
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4101
+    task_id: task_dte_pv_ch6
+    unit: °C
+  - byte_order: abcd
+    channel_name: DTE_CH7当前温度
+    channel_prefix: pv_ch7
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4102
+    task_id: task_dte_pv_ch7
+    unit: °C
+  - byte_order: abcd
+    channel_name: DTE_CH8当前温度
+    channel_prefix: pv_ch8
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4103
+    task_id: task_dte_pv_ch8
+    unit: °C
+  - byte_order: abcd
+    channel_name: DTE_CH5设定温度
+    channel_prefix: sv_ch5
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4108
+    task_id: task_dte_sv_ch5
+    unit: °C
+  - byte_order: abcd
+    channel_name: DTE_CH6设定温度
+    channel_prefix: sv_ch6
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4109
+    task_id: task_dte_sv_ch6
+    unit: °C
+  - byte_order: abcd
+    channel_name: DTE_CH7设定温度
+    channel_prefix: sv_ch7
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4110
+    task_id: task_dte_sv_ch7
+    unit: °C
+  - byte_order: abcd
+    channel_name: DTE_CH8设定温度
+    channel_prefix: sv_ch8
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4111
+    task_id: task_dte_sv_ch8
+    unit: °C
+  - byte_order: abcd
+    channel_name: DTE_CH5输出功率1
+    channel_prefix: out1_ch5
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4212
+    task_id: task_dte_out1_ch5
+    unit: '%'
+  - byte_order: abcd
+    channel_name: DTE_CH6输出功率1
+    channel_prefix: out1_ch6
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4213
+    task_id: task_dte_out1_ch6
+    unit: '%'
+  - byte_order: abcd
+    channel_name: DTE_CH7输出功率1
+    channel_prefix: out1_ch7
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4214
+    task_id: task_dte_out1_ch7
+    unit: '%'
+  - byte_order: abcd
+    channel_name: DTE_CH8输出功率1
+    channel_prefix: out1_ch8
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4215
+    task_id: task_dte_out1_ch8
+  - byte_order: abcd
+    channel_name: DTE_CH5输出功率2
+    channel_prefix: out2_ch5
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4220
+    task_id: task_dte_out2_ch5
+    unit: '%'
+  - byte_order: abcd
+    channel_name: DTE_CH6输出功率2
+    channel_prefix: out2_ch6
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4221
+    task_id: task_dte_out2_ch6
+    unit: '%'
+  - byte_order: abcd
+    channel_name: DTE_CH7输出功率2
+    channel_prefix: out2_ch7
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4222
+    task_id: task_dte_out2_ch7
+    unit: '%'
+  - byte_order: abcd
+    channel_name: DTE_CH8输出功率2
+    channel_prefix: out2_ch8
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4223
+    task_id: task_dte_out2_ch8
+    unit: '%'
 
 
-# ===== 通道5 数据采集 =====
-- task_id: task_dtm_ch5_pv
-  connection_id: delta_tc_rtu
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 620          # H0x26C
-  quantity: 1
-  data_type: uint16
-  byte_order: abcd
-  channel_prefix: ch5
-  channel_name: DTM_通道5 PV值
-  unit: °C
-  scale: 0.1
-  offset: 0
+  # ===== 通道5 数据采集 =====
+  - task_id: task_dtm_ch5_pv
+    connection_id: delta_tc_rtu
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 620          # H0x26C
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: ch5
+    channel_name: DTM_通道5 PV值
+    unit: °C
+    scale: 0.1
+    offset: 0
 
-- task_id: task_dtm_ch5_sv
-  connection_id: delta_tc_rtu
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 4            # H0x004
-  quantity: 1
-  data_type: uint16
-  byte_order: abcd
-  channel_prefix: ch5
-  channel_name: DTM_通道5 SV值
-  unit: °C
-  scale: 0.1
-  offset: 0
+  - task_id: task_dtm_ch5_sv
+    connection_id: delta_tc_rtu
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4            # H0x004
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: ch5
+    channel_name: DTM_通道5 SV值
+    unit: °C
+    scale: 0.1
+    offset: 0
 
-- task_id: task_dtm_ch5_out1
-  connection_id: delta_tc_rtu
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 636          # H0x27C
-  quantity: 1
-  data_type: uint16
-  byte_order: abcd
-  channel_prefix: ch5
-  channel_name: DTM_通道5 输出1
-  unit: '%'
-  scale: 0.1
-  offset: 0
+  - task_id: task_dtm_ch5_out1
+    connection_id: delta_tc_rtu
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 636          # H0x27C
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: ch5
+    channel_name: DTM_通道5 输出1
+    unit: '%'
+    scale: 0.1
+    offset: 0
 
-- task_id: task_dtm_ch5_out2
-  connection_id: delta_tc_rtu
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 644          # H0x284
-  quantity: 1
-  data_type: uint16
-  byte_order: abcd
-  channel_prefix: ch5
-  channel_name: DTM_通道5 输出2
-  unit: '%'
-  scale: 0.1
-  offset: 0
+  - task_id: task_dtm_ch5_out2
+    connection_id: delta_tc_rtu
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 644          # H0x284
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: ch5
+    channel_name: DTM_通道5 输出2
+    unit: '%'
+    scale: 0.1
+    offset: 0
 
-# ===== 通道6 数据采集 =====
-- task_id: task_dtm_ch6_pv
-  connection_id: delta_tc_rtu
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 621          # H0x26D
-  quantity: 1
-  data_type: uint16
-  byte_order: abcd
-  channel_prefix: ch6
-  channel_name: DTM_通道6 PV值
-  unit: °C
-  scale: 0.1
-  offset: 0
+  # ===== 通道6 数据采集 =====
+  - task_id: task_dtm_ch6_pv
+    connection_id: delta_tc_rtu
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 621          # H0x26D
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: ch6
+    channel_name: DTM_通道6 PV值
+    unit: °C
+    scale: 0.1
+    offset: 0
 
-- task_id: task_dtm_ch6_sv
-  connection_id: delta_tc_rtu
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 5            # H0x005
-  quantity: 1
-  data_type: uint16
-  byte_order: abcd
-  channel_prefix: ch6
-  channel_name: DTM_通道6 SV值
-  unit: °C
-  scale: 0.1
-  offset: 0
+  - task_id: task_dtm_ch6_sv
+    connection_id: delta_tc_rtu
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 5            # H0x005
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: ch6
+    channel_name: DTM_通道6 SV值
+    unit: °C
+    scale: 0.1
+    offset: 0
 
-- task_id: task_dtm_ch6_out1
-  connection_id: delta_tc_rtu
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 637          # H0x27D
-  quantity: 1
-  data_type: uint16
-  byte_order: abcd
-  channel_prefix: ch6
-  channel_name: DTM_通道6 输出1
-  unit: '%'
-  scale: 0.1
-  offset: 0
+  - task_id: task_dtm_ch6_out1
+    connection_id: delta_tc_rtu
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 637          # H0x27D
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: ch6
+    channel_name: DTM_通道6 输出1
+    unit: '%'
+    scale: 0.1
+    offset: 0
 
-- task_id: task_dtm_ch6_out2
-  connection_id: delta_tc_rtu
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 645          # H0x285
-  quantity: 1
-  data_type: uint16
-  byte_order: abcd
-  channel_prefix: ch6
-  channel_name: DTM_通道6 输出2
-  unit: '%'
-  scale: 0.1
-  offset: 0
+  - task_id: task_dtm_ch6_out2
+    connection_id: delta_tc_rtu
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 645          # H0x285
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: ch6
+    channel_name: DTM_通道6 输出2
+    unit: '%'
+    scale: 0.1
+    offset: 0
 
-# ===== 通道7 数据采集 =====
-- task_id: task_dtm_ch7_pv
-  connection_id: delta_tc_rtu
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 622          # H0x26E
-  quantity: 1
-  data_type: uint16
-  byte_order: abcd
-  channel_prefix: ch7
-  channel_name: DTM_通道7 PV值
-  unit: °C
-  scale: 0.1
-  offset: 0
+  # ===== 通道7 数据采集 =====
+  - task_id: task_dtm_ch7_pv
+    connection_id: delta_tc_rtu
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 622          # H0x26E
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: ch7
+    channel_name: DTM_通道7 PV值
+    unit: °C
+    scale: 0.1
+    offset: 0
 
-- task_id: task_dtm_ch7_sv
-  connection_id: delta_tc_rtu
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 6            # H0x006
-  quantity: 1
-  data_type: uint16
-  byte_order: abcd
-  channel_prefix: ch7
-  channel_name: DTM_通道7 SV值
-  unit: °C
-  scale: 0.1
-  offset: 0
+  - task_id: task_dtm_ch7_sv
+    connection_id: delta_tc_rtu
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 6            # H0x006
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: ch7
+    channel_name: DTM_通道7 SV值
+    unit: °C
+    scale: 0.1
+    offset: 0
 
-- task_id: task_dtm_ch7_out1
-  connection_id: delta_tc_rtu
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 638          # H0x27E
-  quantity: 1
-  data_type: uint16
-  byte_order: abcd
-  channel_prefix: ch7
-  channel_name: DTM_通道7 输出1
-  unit: '%'
-  scale: 0.1
-  offset: 0
+  - task_id: task_dtm_ch7_out1
+    connection_id: delta_tc_rtu
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 638          # H0x27E
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: ch7
+    channel_name: DTM_通道7 输出1
+    unit: '%'
+    scale: 0.1
+    offset: 0
 
-- task_id: task_dtm_ch7_out2
-  connection_id: delta_tc_rtu
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 646          # H0x286
-  quantity: 1
-  data_type: uint16
-  byte_order: abcd
-  channel_prefix: ch7
-  channel_name: DTM_通道7 输出2
-  unit: '%'
-  scale: 0.1
-  offset: 0
+  - task_id: task_dtm_ch7_out2
+    connection_id: delta_tc_rtu
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 646          # H0x286
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: ch7
+    channel_name: DTM_通道7 输出2
+    unit: '%'
+    scale: 0.1
+    offset: 0
 
-# ===== 通道8 数据采集 =====
-- task_id: task_dtm_ch8_pv
-  connection_id: delta_tc_rtu
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 623          # H0x26F
-  quantity: 1
-  data_type: uint16
-  byte_order: abcd
-  channel_prefix: ch8
-  channel_name: DTM_通道8 PV值
-  unit: °C
-  scale: 0.1
-  offset: 0
+  # ===== 通道8 数据采集 =====
+  - task_id: task_dtm_ch8_pv
+    connection_id: delta_tc_rtu
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 623          # H0x26F
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: ch8
+    channel_name: DTM_通道8 PV值
+    unit: °C
+    scale: 0.1
+    offset: 0
 
-- task_id: task_dtm_ch8_sv
-  connection_id: delta_tc_rtu
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 7            # H0x007
-  quantity: 1
-  data_type: uint16
-  byte_order: abcd
-  channel_prefix: ch8
-  channel_name: DTM_通道8 SV值
-  unit: °C
-  scale: 0.1
-  offset: 0
+  - task_id: task_dtm_ch8_sv
+    connection_id: delta_tc_rtu
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 7            # H0x007
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: ch8
+    channel_name: DTM_通道8 SV值
+    unit: °C
+    scale: 0.1
+    offset: 0
 
-- task_id: task_dtm_ch8_out1
-  connection_id: delta_tc_rtu
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 639          # H0x27F
-  quantity: 1
-  data_type: uint16
-  byte_order: abcd
-  channel_prefix: ch8
-  channel_name: DTM_通道8 输出1
-  unit: '%'
-  scale: 0.1
-  offset: 0
+  - task_id: task_dtm_ch8_out1
+    connection_id: delta_tc_rtu
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 639          # H0x27F
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: ch8
+    channel_name: DTM_通道8 输出1
+    unit: '%'
+    scale: 0.1
+    offset: 0
 
-- task_id: task_dtm_ch8_out2
-  connection_id: delta_tc_rtu
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 647          # H0x287
-  quantity: 1
-  data_type: uint16
-  byte_order: abcd
-  channel_prefix: ch8
-  channel_name: DTM_通道8 输出2
-  unit: '%'
-  scale: 0.1
-  offset: 0
+  - task_id: task_dtm_ch8_out2
+    connection_id: delta_tc_rtu
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 647          # H0x287
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: ch8
+    channel_name: DTM_通道8 输出2
+    unit: '%'
+    scale: 0.1
+    offset: 0
