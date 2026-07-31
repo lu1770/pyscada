@@ -1,0 +1,361 @@
+# ================================================================
+# 多通道工业数据采集系统 - 配置文件
+# 设备: Keyence PLC (30工站整机/接粉平台/树脂叉车等)
+# 说明: 每个点位单独配置一个采集任务
+# ================================================================
+
+# ---------------------------
+# 全局配置
+# ---------------------------
+# 采集间隔（秒），控制轮询频率
+poll_interval: 0.5
+
+
+# ---------------------------
+# 设备连接配置
+# ---------------------------
+connections:
+  # Keyence PLC 主机
+  keyence_plc1:
+    type: keyence
+    params:
+      host: 192.168.2.100
+      port: 8501
+      unit: 0
+      timeout: 3.0
+
+
+# ---------------------------
+# 采集任务配置
+# ---------------------------
+tasks:
+
+  # ============================
+  # 1. 整机 - 机台状态 (DM304, UDInt)
+  # ============================
+  - task_id: task_machine_status
+    connection_id: keyence_plc1
+    connection_type: keyence
+    device_type: DM
+    start_addr: 304
+    quantity: 2
+    data_type: uint32
+    byte_order: abcd
+    channel_prefix: machine_status
+    channel_name: 整机机台状态
+    unit: ''
+    scale: 1.0
+    offset: 0
+
+  # ============================
+  # 2. 接粉平台 - UF1 (R20600, BOOL)
+  # ============================
+  - task_id: task_pickup_uf1
+    connection_id: keyence_plc1
+    connection_type: keyence
+    device_type: MR
+    start_addr: 20600
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: pickup_uf1
+    channel_name: 接粉平台离型膜状态(UF1)
+    unit: ''
+    scale: 1.0
+    offset: 0
+
+  # ============================
+  # 3. 接粉平台 - UF2 (R20601, BOOL)
+  # ============================
+  - task_id: task_pickup_uf2
+    connection_id: keyence_plc1
+    connection_type: keyence
+    device_type: MR
+    start_addr: 20601
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: pickup_uf2
+    channel_name: 接粉平台离型膜状态(UF2)
+    unit: ''
+    scale: 1.0
+    offset: 0
+
+  # ============================
+  # 4. 接粉平台 - DF1 (R20602, BOOL)
+  # ============================
+  - task_id: task_pickup_df1
+    connection_id: keyence_plc1
+    connection_type: keyence
+    device_type: MR
+    start_addr: 20602
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: pickup_df1
+    channel_name: 接粉平台离型膜状态(DF1)
+    unit: ''
+    scale: 1.0
+    offset: 0
+
+  # ============================
+  # 5. 接粉平台 - DF2 (R20603, BOOL)
+  # ============================
+  - task_id: task_pickup_df2
+    connection_id: keyence_plc1
+    connection_type: keyence
+    device_type: MR
+    start_addr: 20603
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: pickup_df2
+    channel_name: 接粉平台离型膜状态(DF2)
+    unit: ''
+    scale: 1.0
+    offset: 0
+
+  # ============================
+  # 6. 接粉平台 - UP1 (R20604, BOOL)
+  # ============================
+  - task_id: task_pickup_up1
+    connection_id: keyence_plc1
+    connection_type: keyence
+    device_type: MR
+    start_addr: 20604
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: pickup_up1
+    channel_name: 接粉平台3树脂状态(UP1)
+    unit: ''
+    scale: 1.0
+    offset: 0
+
+  # ============================
+  # 7. 接粉平台 - UP2 (R20605, BOOL)
+  # ============================
+  - task_id: task_pickup_up2
+    connection_id: keyence_plc1
+    connection_type: keyence
+    device_type: MR
+    start_addr: 20605
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: pickup_up2
+    channel_name: 接粉平台4树脂状态(UP2)
+    unit: ''
+    scale: 1.0
+    offset: 0
+
+  # ============================
+  # 8. 接粉平台 - DP1 (R20606, BOOL)
+  # ============================
+  - task_id: task_pickup_dp1
+    connection_id: keyence_plc1
+    connection_type: keyence
+    device_type: MR
+    start_addr: 20606
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: pickup_dp1
+    channel_name: 接粉平台1树脂状态(DP1)
+    unit: ''
+    scale: 1.0
+    offset: 0
+
+  # ============================
+  # 9. 接粉平台 - DP2 (R20607, BOOL)
+  # ============================
+  - task_id: task_pickup_dp2
+    connection_id: keyence_plc1
+    connection_type: keyence
+    device_type: MR
+    start_addr: 20607
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: pickup_dp2
+    channel_name: 接粉平台2树脂状态(DP2)
+    unit: ''
+    scale: 1.0
+    offset: 0
+
+  # ============================
+  # 10. 粉框上层 (R20608, BOOL)
+  # ============================
+  - task_id: task_frame_upper
+    connection_id: keyence_plc1
+    connection_type: keyence
+    device_type: MR
+    start_addr: 20608
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: frame_upper
+    channel_name: 上层刷框平台感应器状态
+    unit: ''
+    scale: 1.0
+    offset: 0
+
+  # ============================
+  # 11. 粉框下层 (R20609, BOOL)
+  # ============================
+  - task_id: task_frame_lower
+    connection_id: keyence_plc1
+    connection_type: keyence
+    device_type: MR
+    start_addr: 20609
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: frame_lower
+    channel_name: 下层刷框平台感应器状态
+    unit: ''
+    scale: 1.0
+    offset: 0
+
+  # ============================
+  # 12. 夹爪上层 (R20610, BOOL)
+  # ============================
+  - task_id: task_clamp_upper
+    connection_id: keyence_plc1
+    connection_type: keyence
+    device_type: MR
+    start_addr: 20610
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: clamp_upper
+    channel_name: 上层夹框夹爪感应器状态
+    unit: ''
+    scale: 1.0
+    offset: 0
+
+  # ============================
+  # 13. 夹爪下层 (R20611, BOOL)
+  # ============================
+  - task_id: task_clamp_lower
+    connection_id: keyence_plc1
+    connection_type: keyence
+    device_type: MR
+    start_addr: 20611
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: clamp_lower
+    channel_name: 下层夹框夹爪感应器状态
+    unit: ''
+    scale: 1.0
+    offset: 0
+
+  # ============================
+  # 14. 树脂叉车 - UR (R20700, BOOL)
+  # ============================
+  - task_id: task_forklift_ur
+    connection_id: keyence_plc1
+    connection_type: keyence
+    device_type: MR
+    start_addr: 20700
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: forklift_ur
+    channel_name: 粉料搬运上料板状态(上层)
+    unit: ''
+    scale: 1.0
+    offset: 0
+
+  # ============================
+  # 15. 树脂叉车 - DR (R20701, BOOL)
+  # ============================
+  - task_id: task_forklift_dr
+    connection_id: keyence_plc1
+    connection_type: keyence
+    device_type: MR
+    start_addr: 20701
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: forklift_dr
+    channel_name: 粉料搬运上料板状态(下层)
+    unit: ''
+    scale: 1.0
+    offset: 0
+
+  # ============================
+  # 16. 树脂叉车 - UWF (R20702, BOOL)
+  # ============================
+  - task_id: task_forklift_uwf
+    connection_id: keyence_plc1
+    connection_type: keyence
+    device_type: MR
+    start_addr: 20702
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: forklift_uwf
+    channel_name: 粉料搬运废膜板状态(上层)
+    unit: ''
+    scale: 1.0
+    offset: 0
+
+  # ============================
+  # 17. 树脂叉车 - DWF (R20703, BOOL)
+  # ============================
+  - task_id: task_forklift_dwf
+    connection_id: keyence_plc1
+    connection_type: keyence
+    device_type: MR
+    start_addr: 20703
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: forklift_dwf
+    channel_name: 粉料搬运废膜板状态(下层)
+    unit: ''
+    scale: 1.0
+    offset: 0
+
+  # ============================
+  # 18. 搬运X轴当前位置 (DM314, LReal/64位浮点)
+  # ============================
+  - task_id: task_transfer_x_position
+    connection_id: keyence_plc1
+    connection_type: keyence
+    device_type: DM
+    start_addr: 314
+    quantity: 4
+    data_type: float64
+    byte_order: abcd
+    channel_prefix: transfer_x
+    channel_name: 芯片搬运X实时位置
+    unit: mm
+    scale: 1.0
+    offset: 0
+
+  # ============================
+  # 19. 搬运Y轴当前位置 (DM318, LReal/64位浮点, 实际值缩小100倍)
+  # ============================
+  - task_id: task_transfer_y_position
+    connection_id: keyence_plc1
+    connection_type: keyence
+    device_type: DM
+    start_addr: 318
+    quantity: 4
+    data_type: float64
+    byte_order: abcd
+    channel_prefix: transfer_y
+    channel_name: 芯片搬运Y实时位置
+    unit: mm
+    scale: 0.01
+    offset: 0
+    # 备注: PLC内实际值缩小100倍存储，scale=0.01还原为mm
+
+
+# ---------------------------
+# 写入任务配置（可选，本配置暂不使用）
+# ---------------------------
+write_tasks: []
