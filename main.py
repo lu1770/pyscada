@@ -275,6 +275,33 @@ class ByteOrderDecoder:
             raise ValueError(f"不支持的字节序: {byte_order}")
 
     @classmethod
+    def encode(cls, value: float, data_type: str, byte_order: str = "abcd") -> bytes:
+        """
+        将单个值编码为指定数据类型和字节序的原始字节（用于写入寄存器）
+        编码过程为 decode 的逆操作。
+
+        Args:
+            value: 要编码的数值
+            data_type: 数据类型，如 "uint16", "int32", "float32", "float64" 等
+            byte_order: 字节序，可选值 "abcd", "dcba", "badc", "cdab"
+
+        Returns:
+            编码后的字节数据（网络字节序，每个寄存器2字节）
+        """
+        type_info = cls._TYPE_INFO.get(data_type.lower())
+        if type_info is None:
+            raise ValueError(f"不支持的数据类型: {data_type}")
+
+        fmt = type_info["fmt"]
+        # 整数类型需将浮点形式转换为整数（用户在 UI 中可能输入 10.0）
+        if fmt[-1] in ("h", "H", "i", "I", "q", "Q"):
+            value = int(round(value))
+        native_bytes = struct.pack(fmt, value)
+        # _reorder_bytes 是对称变换（再次执行同种重排会还原），
+        # 对 native 大端字节执行同样重排即可得到目标字节序的写入字节
+        return cls._reorder_bytes(native_bytes, byte_order.lower())
+
+    @classmethod
     def get_supported_types(cls) -> list:
         """返回支持的所有数据类型列表"""
         return list(cls._TYPE_INFO.keys())
@@ -325,6 +352,9 @@ class ModbusTCPConnector:
     FUNC_READ_HOLDING   = 0x03
     FUNC_READ_INPUT_REG = 0x04
     FUNC_READ_COILS     = 0x01
+    FUNC_WRITE_SINGLE_COIL   = 0x05
+    FUNC_WRITE_SINGLE_REG    = 0x06
+    FUNC_WRITE_MULTI_REGS    = 0x10
 
     def __init__(self, connection_id: str, host: str, port: int = 502,
                  slave_id: int = 1, timeout: float = 3.0):
@@ -475,6 +505,72 @@ class ModbusTCPConnector:
                 values.append(0)
         return values
 
+    # ---- 写入接口 ----
+    def _send_write_request(self, func_code: int, pdu_body: bytes) -> bool:
+        """发送写请求并验证响应。返回 True 表示写入成功。"""
+        if not self._sock:
+            return False
+        with self._lock:
+            self._txn_id = (self._txn_id + 1) & 0xFFFF
+            length = 2 + len(pdu_body)  # unit_id(1) + pdu
+            mbap = struct.pack(">HHH", self._txn_id, 0, length)
+            frame = mbap + pdu_body
+            try:
+                self._sock.sendall(frame)
+                resp = self._recv_response()
+                if resp is None or len(resp) < 9:
+                    return False
+                # 验证事务ID与功能码（异常码高位为1表示出错）
+                resp_txn = struct.unpack(">H", resp[0:2])[0]
+                if resp_txn != self._txn_id:
+                    return False
+                func_resp = resp[7]
+                if func_resp & 0x80:
+                    exc_code = resp[8] if len(resp) > 8 else -1
+                    print(f"[Modbus TCP] 写入异常: func={func_resp:#x}, exc={exc_code}")
+                    return False
+                return True
+            except Exception as e:
+                print(f"[Modbus TCP] 写入通信错误: {e}")
+                self.disconnect()
+                return False
+
+    def write_single_coil(self, addr: int, value: bool) -> bool:
+        """写单个线圈 (功能码 0x05)。ON=0xFF00, OFF=0x0000"""
+        coil_value = 0xFF00 if value else 0x0000
+        pdu = struct.pack(">BBHH", self.slave_id, self.FUNC_WRITE_SINGLE_COIL,
+                          addr, coil_value)
+        return self._send_write_request(self.FUNC_WRITE_SINGLE_COIL, pdu)
+
+    def write_single_register(self, addr: int, value: int) -> bool:
+        """写单个保持寄存器 (功能码 0x06)。value 应为 0-65535。"""
+        value = int(value) & 0xFFFF
+        pdu = struct.pack(">BBHH", self.slave_id, self.FUNC_WRITE_SINGLE_REG,
+                          addr, value)
+        return self._send_write_request(self.FUNC_WRITE_SINGLE_REG, pdu)
+
+    def write_multiple_registers(self, addr: int, values: list) -> bool:
+        """写多个保持寄存器 (功能码 0x10)。values 为整数列表 (每个0-65535)。"""
+        if not values:
+            return False
+        reg_count = len(values)
+        byte_count = reg_count * 2
+        regs_bytes = b"".join(struct.pack(">H", int(v) & 0xFFFF) for v in values)
+        pdu = struct.pack(">BBHHB", self.slave_id, self.FUNC_WRITE_MULTI_REGS,
+                          addr, reg_count, byte_count) + regs_bytes
+        return self._send_write_request(self.FUNC_WRITE_MULTI_REGS, pdu)
+
+    def write_registers_raw(self, addr: int, raw_bytes: bytes) -> bool:
+        """以原始字节写入连续保持寄存器 (功能码 0x10)。
+        raw_bytes 长度必须为偶数（每2字节一个寄存器）。"""
+        if not raw_bytes or len(raw_bytes) % 2 != 0:
+            return False
+        reg_count = len(raw_bytes) // 2
+        byte_count = len(raw_bytes)
+        pdu = struct.pack(">BBHHB", self.slave_id, self.FUNC_WRITE_MULTI_REGS,
+                          addr, reg_count, byte_count) + raw_bytes
+        return self._send_write_request(self.FUNC_WRITE_MULTI_REGS, pdu)
+
 
 # ================================================================
 #  第四部分: Modbus RTU 连接器 (串口实现)
@@ -485,6 +581,9 @@ class ModbusRTUConnector:
     FUNC_READ_HOLDING   = 0x03
     FUNC_READ_INPUT_REG = 0x04
     FUNC_READ_COILS     = 0x01
+    FUNC_WRITE_SINGLE_COIL   = 0x05
+    FUNC_WRITE_SINGLE_REG    = 0x06
+    FUNC_WRITE_MULTI_REGS    = 0x10
 
     _CRC_TABLE = [
         0x0000, 0xC0C1, 0xC181, 0x0140, 0xC301, 0x03C0, 0x0280, 0xC241,
@@ -696,6 +795,74 @@ class ModbusRTUConnector:
                 values.append(0)
         return values
 
+    # ---- 写入接口 ----
+    def _build_write_frame(self, func_code: int, pdu_body: bytes) -> bytes:
+        """构造 RTU 写帧：slave_id + func_code + pdu_body + CRC"""
+        full = bytes([self.slave_id, func_code]) + pdu_body
+        crc = self._calc_crc(full)
+        return full + struct.pack("<H", crc)
+
+    def _send_write_request(self, func_code: int, pdu_body: bytes) -> bool:
+        """发送写请求并验证响应。返回 True 表示写入成功。"""
+        if not self._ser or not self._ser.is_open:
+            return False
+        with self._lock:
+            try:
+                frame = self._build_write_frame(func_code, pdu_body)
+                self._ser.flushInput()
+                self._ser.write(frame)
+                self._ser.flush()
+                resp = self._recv_response()
+                if resp is None or len(resp) < 5:
+                    return False
+                if not self._validate_frame(resp):
+                    return False
+                func_resp = resp[1]
+                if func_resp & 0x80:
+                    exc_code = resp[2] if len(resp) > 2 else -1
+                    print(f"[Modbus RTU] 写入异常: func={func_resp:#x}, exc={exc_code}")
+                    return False
+                # 验证回显地址/功能码与请求一致
+                if resp[0] != self.slave_id or resp[1] != func_code:
+                    return False
+                return True
+            except Exception as e:
+                print(f"[Modbus RTU] 写入通信错误: {e}")
+                self.disconnect()
+                return False
+
+    def write_single_coil(self, addr: int, value: bool) -> bool:
+        """写单个线圈 (功能码 0x05)。ON=0xFF00, OFF=0x0000"""
+        coil_value = 0xFF00 if value else 0x0000
+        pdu_body = struct.pack(">HH", addr, coil_value)
+        return self._send_write_request(self.FUNC_WRITE_SINGLE_COIL, pdu_body)
+
+    def write_single_register(self, addr: int, value: int) -> bool:
+        """写单个保持寄存器 (功能码 0x06)。value 应为 0-65535。"""
+        value = int(value) & 0xFFFF
+        pdu_body = struct.pack(">HH", addr, value)
+        return self._send_write_request(self.FUNC_WRITE_SINGLE_REG, pdu_body)
+
+    def write_multiple_registers(self, addr: int, values: list) -> bool:
+        """写多个保持寄存器 (功能码 0x10)。values 为整数列表 (每个0-65535)。"""
+        if not values:
+            return False
+        reg_count = len(values)
+        byte_count = reg_count * 2
+        regs_bytes = b"".join(struct.pack(">H", int(v) & 0xFFFF) for v in values)
+        pdu_body = struct.pack(">HHB", addr, reg_count, byte_count) + regs_bytes
+        return self._send_write_request(self.FUNC_WRITE_MULTI_REGS, pdu_body)
+
+    def write_registers_raw(self, addr: int, raw_bytes: bytes) -> bool:
+        """以原始字节写入连续保持寄存器 (功能码 0x10)。
+        raw_bytes 长度必须为偶数（每2字节一个寄存器）。"""
+        if not raw_bytes or len(raw_bytes) % 2 != 0:
+            return False
+        reg_count = len(raw_bytes) // 2
+        byte_count = len(raw_bytes)
+        pdu_body = struct.pack(">HHB", addr, reg_count, byte_count) + raw_bytes
+        return self._send_write_request(self.FUNC_WRITE_MULTI_REGS, pdu_body)
+
 
 # ================================================================
 #  第四部分: Modbus ASCII 连接器 (串口实现)
@@ -706,6 +873,9 @@ class ModbusASCIIConnector:
     FUNC_READ_HOLDING   = 0x03
     FUNC_READ_INPUT_REG = 0x04
     FUNC_READ_COILS     = 0x01
+    FUNC_WRITE_SINGLE_COIL   = 0x05
+    FUNC_WRITE_SINGLE_REG    = 0x06
+    FUNC_WRITE_MULTI_REGS    = 0x10
 
     def __init__(self, connection_id: str, port: str = "COM1",
                  baudrate: int = 9600, slave_id: int = 1,
@@ -915,6 +1085,75 @@ class ModbusASCIIConnector:
                 values.append(0)
         return values
 
+    # ---- 写入接口 ----
+    def _build_write_frame(self, func_code: int, pdu_body: bytes) -> bytes:
+        """构造 ASCII 写帧：以 ':' 开头，slave_id + func_code + pdu_body + LRC，
+        以 CRLF 结尾，返回 ASCII 编码的字节串。"""
+        full = bytes([self.slave_id, func_code]) + pdu_body
+        lrc = self._calc_lrc(full)
+        hex_str = ":" + full.hex().upper() + f"{lrc:02X}" + "\r\n"
+        return hex_str.encode("ascii")
+
+    def _send_write_request(self, func_code: int, pdu_body: bytes) -> bool:
+        """发送写请求并验证响应。返回 True 表示写入成功。"""
+        if not self._ser or not self._ser.is_open:
+            return False
+        with self._lock:
+            try:
+                frame = self._build_write_frame(func_code, pdu_body)
+                self._ser.flushInput()
+                self._ser.write(frame)
+                self._ser.flush()
+                # 复用读取路径获取响应
+                resp = self._recv_response()
+                if resp is None or len(resp) < 4:
+                    return False
+                # _recv_response 已返回 raw_bytes（不含 LRC）
+                func_resp = resp[1]
+                if func_resp & 0x80:
+                    exc_code = resp[2] if len(resp) > 2 else -1
+                    print(f"[Modbus ASCII] 写入异常: func={func_resp:#x}, exc={exc_code}")
+                    return False
+                if resp[0] != self.slave_id or resp[1] != func_code:
+                    return False
+                return True
+            except Exception as e:
+                print(f"[Modbus ASCII] 写入通信错误: {e}")
+                self.disconnect()
+                return False
+
+    def write_single_coil(self, addr: int, value: bool) -> bool:
+        """写单个线圈 (功能码 0x05)。ON=0xFF00, OFF=0x0000"""
+        coil_value = 0xFF00 if value else 0x0000
+        pdu_body = struct.pack(">HH", addr, coil_value)
+        return self._send_write_request(self.FUNC_WRITE_SINGLE_COIL, pdu_body)
+
+    def write_single_register(self, addr: int, value: int) -> bool:
+        """写单个保持寄存器 (功能码 0x06)。value 应为 0-65535。"""
+        value = int(value) & 0xFFFF
+        pdu_body = struct.pack(">HH", addr, value)
+        return self._send_write_request(self.FUNC_WRITE_SINGLE_REG, pdu_body)
+
+    def write_multiple_registers(self, addr: int, values: list) -> bool:
+        """写多个保持寄存器 (功能码 0x10)。values 为整数列表 (每个0-65535)。"""
+        if not values:
+            return False
+        reg_count = len(values)
+        byte_count = reg_count * 2
+        regs_bytes = b"".join(struct.pack(">H", int(v) & 0xFFFF) for v in values)
+        pdu_body = struct.pack(">HHB", addr, reg_count, byte_count) + regs_bytes
+        return self._send_write_request(self.FUNC_WRITE_MULTI_REGS, pdu_body)
+
+    def write_registers_raw(self, addr: int, raw_bytes: bytes) -> bool:
+        """以原始字节写入连续保持寄存器 (功能码 0x10)。
+        raw_bytes 长度必须为偶数（每2字节一个寄存器）。"""
+        if not raw_bytes or len(raw_bytes) % 2 != 0:
+            return False
+        reg_count = len(raw_bytes) // 2
+        byte_count = len(raw_bytes)
+        pdu_body = struct.pack(">HHB", addr, reg_count, byte_count) + raw_bytes
+        return self._send_write_request(self.FUNC_WRITE_MULTI_REGS, pdu_body)
+
 
 # ================================================================
 #  第五部分: 基恩士(Keyence) PLC 连接器
@@ -1044,6 +1283,36 @@ class KeyencePLCConnector:
     def read_lr(self, start_addr: int, count: int = 1):
         return self.read_device("LR", start_addr, count)
 
+    def write_device(self, device_type: str, start_addr: int,
+                     value, data_type: str = "") -> bool:
+        """
+        通用设备写入（Keyence 上位链接协议 WT 命令）
+        device_type: DM / MR / LR / TIM / CNT / VR 等
+        data_type:   数据类型，用于生成类型后缀（同 read_device）
+        value:       要写入的值（数字）
+
+        命令格式: WT <设备类型><起始地址>.<类型后缀> <值>
+        示例:     WT DM6000.U 100     -> 将100写入DM6000(无符号16位)
+                  WT DM300.F 3.14     -> 将3.14写入DM300(float32)
+        返回 True 表示写入成功，False 表示失败。
+        """
+        dt = device_type.upper()[:3]
+        type_suffix = self.KEYENCE_TYPE_MAP.get(data_type.lower(), ".U")
+        # 浮点类型保留浮点字面量；整数类型直接输出整数
+        if type_suffix in (".F", ".LF"):
+            value_str = f"{float(value)}"
+        else:
+            value_str = f"{int(round(float(value)))}"
+        cmd = f"WT {dt}{start_addr}{type_suffix} {value_str}"
+        resp = self._send_command(cmd)
+        if resp is None:
+            return False
+        if resp.startswith("E"):
+            print(f"[Keyence] PLC写入错误: {resp} (命令: {cmd})")
+            return False
+        # 成功响应为 "OK" 或空字符串（视型号而定），不含 'E' 即视为成功
+        return True
+
 
 # ================================================================
 #  第四部分: 采集任务与后台采集线程
@@ -1117,20 +1386,83 @@ class PollingTask:
         return cls(byte_order=byte_order, **d)
 
 
+class WriteTask:
+    """单个写入任务配置 — 周期性向设备写入指定值
+
+    属性:
+      task_id          任务唯一ID
+      connection_id    所属连接ID
+      connection_type  连接类型（modbus_tcp/modbus_rtu/modbus_ascii/keyence）
+      device_type      设备类型/区域（modbus: holding/input/coil；keyence: DM/MR/LR/...）
+      start_addr       起始地址
+      value            要写入的值（数字）
+      write_interval   写入频率（秒），即每隔多久写入一次
+      data_type        数据类型（uint16/int32/float32/...）
+      byte_order       字节序（仅 Modbus 多寄存器写入时使用）
+      name             任务显示名称（可选）
+    """
+
+    _TYPE_TO_REGISTERS = PollingTask._TYPE_TO_REGISTERS
+
+    def __init__(self, task_id: str, connection_id: str,
+                 connection_type: str, device_type: str,
+                 start_addr: int, value: float,
+                 write_interval: float = 1.0,
+                 data_type: str = "uint16",
+                 byte_order: str = "abcd",
+                 name: str = ""):
+        self.task_id = task_id
+        self.connection_id = connection_id
+        self.connection_type = connection_type
+        self.device_type = device_type
+        self.start_addr = int(start_addr)
+        self.value = float(value)
+        self.write_interval = float(write_interval)
+        self.data_type = data_type
+        self.byte_order = byte_order
+        self.name = name or f"写{device_type}{start_addr}"
+
+    def get_registers_per_value(self) -> int:
+        return self._TYPE_TO_REGISTERS.get(self.data_type.lower(), 1)
+
+    def to_dict(self):
+        return {
+            "task_id": self.task_id,
+            "connection_id": self.connection_id,
+            "connection_type": self.connection_type,
+            "device_type": self.device_type,
+            "start_addr": self.start_addr,
+            "value": self.value,
+            "write_interval": self.write_interval,
+            "data_type": self.data_type,
+            "byte_order": self.byte_order,
+            "name": self.name,
+        }
+
+    @classmethod
+    def from_dict(cls, d):
+        return cls(**d)
+
+
 class AcquisitionWorker(QObject):
     """后台采集线程 — 逐任务轮询所有连接"""
     data_acquired = Signal(str, float, float)
     connection_status = Signal(str, bool, str)
     error_occurred = Signal(str, str)
+    write_status = Signal(str, bool, str)  # (task_id, success, message)
 
     def __init__(self, store: DataStore):
         super().__init__()
         self.store = store
         self._connections = {}
         self._tasks = []
+        self._write_tasks = []  # WriteTask 列表
         self._running = False
         self._poll_interval = 0.5
         self._thread = None
+        self._write_thread = None
+        # 记录每个写入任务下一次应触发的时间戳
+        self._write_next_time: dict = {}
 
     def add_connection(self, conn_id: str, conn_type: str, **kwargs):
         if conn_type == "modbus_tcp":
@@ -1155,8 +1487,17 @@ class AcquisitionWorker(QObject):
                 task.scale, task.offset, task.data_type
             )
 
+    def add_write_task(self, task: WriteTask):
+        self._write_tasks.append(task)
+
+    def remove_write_task(self, task_id: str):
+        self._write_tasks = [t for t in self._write_tasks if t.task_id != task_id]
+        self._write_next_time.pop(task_id, None)
+
     def clear_all(self):
         self._tasks.clear()
+        self._write_tasks.clear()
+        self._write_next_time.clear()
         for conn in self._connections.values():
             conn["connector"].disconnect()
         self._connections.clear()
@@ -1170,11 +1511,18 @@ class AcquisitionWorker(QObject):
         self._running = True
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
         self._thread.start()
+        # 启动写入线程（仅当存在写入任务时）
+        if self._write_tasks:
+            self._write_thread = threading.Thread(target=self._run_write_loop, daemon=True)
+            self._write_thread.start()
 
     def stop(self):
         self._running = False
         if self._thread:
             self._thread.join(timeout=5)
+        if self._write_thread:
+            self._write_thread.join(timeout=5)
+        self._write_next_time.clear()
 
     def _run_loop(self):
         # 连接所有设备
@@ -1235,7 +1583,7 @@ class AcquisitionWorker(QObject):
                     raw_bytes = connector.read_input_registers_raw(task.start_addr, total_registers)
                 else:
                     raw_bytes = connector.read_holding_registers_raw(task.start_addr, total_registers)
-                
+
                 if raw_bytes is None:
                     return None
                 try:
@@ -1246,6 +1594,70 @@ class AcquisitionWorker(QObject):
         elif isinstance(connector, KeyencePLCConnector):
             return connector.read_device(task.device_type, task.start_addr, task.quantity, task.data_type)
         return None
+
+    # ---- 写入循环 ----
+    def _run_write_loop(self):
+        """独立线程：按每个写入任务的频率周期性写入指定值。
+        不同任务可有不同的写入频率；线程按 50ms 粒度检查到期任务。"""
+        # 初始化下次触发时间为当前时间（启动后立即执行一次）
+        now = time.time()
+        for t in self._write_tasks:
+            self._write_next_time[t.task_id] = now
+
+        while self._running:
+            now = time.time()
+            for task in list(self._write_tasks):
+                if not self._running:
+                    break
+                next_t = self._write_next_time.get(task.task_id)
+                if next_t is None:
+                    self._write_next_time[task.task_id] = now
+                    continue
+                if now < next_t:
+                    continue
+                # 到期，执行写入
+                ok, msg = self._write_one(task)
+                self.write_status.emit(task.task_id, ok, msg)
+                # 安排下一次触发
+                self._write_next_time[task.task_id] = time.time() + max(0.05, task.write_interval)
+            time.sleep(0.05)
+
+    def _write_one(self, task: WriteTask):
+        """执行一次写入。返回 (success, message)"""
+        conn_info = self._connections.get(task.connection_id)
+        if not conn_info:
+            return False, f"连接ID '{task.connection_id}' 不存在"
+        connector = conn_info["connector"]
+        if not connector.is_connected():
+            if not connector.connect():
+                return False, "设备未连接且重连失败"
+        try:
+            if isinstance(connector, (ModbusTCPConnector, ModbusRTUConnector, ModbusASCIIConnector)):
+                if task.device_type == "coil":
+                    # 线圈：value 非0视为 ON
+                    ok = connector.write_single_coil(task.start_addr, bool(task.value))
+                else:
+                    # 保持寄存器：按数据类型/字节序编码后写入
+                    # input 区域不可写，自动回退到 holding
+                    raw = ByteOrderDecoder.encode(task.value, task.data_type, task.byte_order)
+                    # uint16/int16 单寄存器使用 0x06，其他多寄存器使用 0x10
+                    if task.get_registers_per_value() == 1:
+                        ok = connector.write_single_register(task.start_addr, int.from_bytes(raw, "big"))
+                    else:
+                        ok = connector.write_registers_raw(task.start_addr, raw)
+                if ok:
+                    return True, f"写入成功: {task.value}"
+                return False, "写入失败（设备返回异常或无响应）"
+            elif isinstance(connector, KeyencePLCConnector):
+                ok = connector.write_device(task.device_type, task.start_addr,
+                                            task.value, task.data_type)
+                if ok:
+                    return True, f"写入成功: {task.value}"
+                return False, "写入失败（PLC返回错误或无响应）"
+            else:
+                return False, f"不支持的连接器类型: {type(connector).__name__}"
+        except Exception as e:
+            return False, f"写入异常: {e}"
 
 
 # ================================================================
@@ -1557,7 +1969,7 @@ class TaskConfigDialog(QWidget):
         layout.addLayout(btn_layout, 11, 0, 1, 2)
 
     @_safe_event
-    def _on_conn_changed(self):
+    def _on_conn_changed(self, *args):
         cid = self.cmb_conn.currentData()
         if cid is None:
             return
@@ -1600,6 +2012,136 @@ class TaskConfigDialog(QWidget):
         self.close()
 
 
+class WriteTaskConfigDialog(QWidget):
+    """写入任务配置对话框 — 配置写入频率与写入值"""
+    write_task_added = Signal(dict)
+
+    def __init__(self, connections: dict):
+        super().__init__()
+        self._connections = connections
+        self.setWindowTitle("添加写入任务")
+        self.setWindowModality(Qt.ApplicationModal)
+        self.setMinimumWidth(400)
+        self._build_ui()
+
+    def _build_ui(self):
+        layout = QGridLayout(self)
+
+        layout.addWidget(QLabel("所属连接:"), 0, 0)
+        self.cmb_conn = QComboBox()
+        for cid, info in self._connections.items():
+            label = f"{cid} ({info['type']})"
+            if info['type'] == 'modbus_tcp':
+                label += f" {info['params'].get('host','')}:{info['params'].get('port',502)}"
+            elif info['type'] in ['modbus_rtu', 'modbus_ascii']:
+                label += f" {info['params'].get('port','')} @ {info['params'].get('baudrate',9600)}"
+            else:
+                label += f" {info['params'].get('host','')}:{info['params'].get('port',3000)}"
+            self.cmb_conn.addItem(label, cid)
+        layout.addWidget(self.cmb_conn, 0, 1)
+
+        layout.addWidget(QLabel("任务名称:"), 1, 0)
+        self.edit_name = QLineEdit("写值任务")
+        layout.addWidget(self.edit_name, 1, 1)
+
+        layout.addWidget(QLabel("设备类型:"), 2, 0)
+        self.cmb_device = QComboBox()
+        layout.addWidget(self.cmb_device, 2, 1)
+
+        layout.addWidget(QLabel("起始地址:"), 3, 0)
+        self.spin_addr = QSpinBox()
+        self.spin_addr.setRange(0, 999999)
+        layout.addWidget(self.spin_addr, 3, 1)
+
+        layout.addWidget(QLabel("写入值:"), 4, 0)
+        self.spin_value = QDoubleSpinBox()
+        self.spin_value.setRange(-999999999, 999999999)
+        self.spin_value.setDecimals(6)
+        self.spin_value.setValue(0.0)
+        layout.addWidget(self.spin_value, 4, 1)
+
+        layout.addWidget(QLabel("写入频率(秒):"), 5, 0)
+        self.spin_interval = QDoubleSpinBox()
+        self.spin_interval.setRange(0.05, 3600.0)
+        self.spin_interval.setSingleStep(0.1)
+        self.spin_interval.setDecimals(3)
+        self.spin_interval.setValue(1.0)
+        layout.addWidget(self.spin_interval, 5, 1)
+
+        layout.addWidget(QLabel("数据类型:"), 6, 0)
+        self.cmb_data_type = QComboBox()
+        self.cmb_data_type.addItems([
+            "uint16", "int16", "uint32", "int32",
+            "float32", "uint64", "int64", "float64"
+        ])
+        self.cmb_data_type.setCurrentText("uint16")
+        layout.addWidget(self.cmb_data_type, 6, 1)
+
+        layout.addWidget(QLabel("字节序:"), 7, 0)
+        self.cmb_byte_order = QComboBox()
+        self.cmb_byte_order.addItems([
+            "abcd (大端)", "dcba (小端)",
+            "badc (双字节交换)", "cdab (四字交换)"
+        ])
+        self.cmb_byte_order.setCurrentText("abcd (大端)")
+        layout.addWidget(self.cmb_byte_order, 7, 1)
+
+        self.cmb_conn.currentIndexChanged.connect(self._on_conn_changed)
+        self._on_conn_changed()
+
+        btn_layout = QHBoxLayout()
+        btn_ok = QPushButton("确定")
+        btn_cancel = QPushButton("取消")
+        btn_ok.clicked.connect(self._on_ok)
+        btn_cancel.clicked.connect(self.close)
+        btn_layout.addWidget(btn_ok)
+        btn_layout.addWidget(btn_cancel)
+        layout.addLayout(btn_layout, 8, 0, 1, 2)
+
+    @_safe_event
+    def _on_conn_changed(self, *args):
+        cid = self.cmb_conn.currentData()
+        if cid is None:
+            return
+        info = self._connections.get(cid)
+        self.cmb_device.clear()
+        if info and info["type"] in ("modbus_tcp", "modbus_rtu", "modbus_ascii"):
+            # input 区域不可写，仅提供 holding 与 coil
+            self.cmb_device.addItems(["holding", "coil"])
+        elif info and info["type"] == "keyence":
+            self.cmb_device.addItems(["DM", "MR", "LR", "TIM", "CNT", "VR"])
+
+    @_safe_event
+    def _on_ok(self):
+        name = self.edit_name.text().strip()
+        if not name:
+            QMessageBox.warning(self, "警告", "请填写任务名称")
+            return
+        cid = self.cmb_conn.currentData()
+        if cid is None:
+            QMessageBox.warning(self, "警告", "请选择所属连接")
+            return
+
+        data_type = self.cmb_data_type.currentText()
+        byte_order_text = self.cmb_byte_order.currentText()
+        byte_order = byte_order_text.split()[0]
+
+        task_dict = {
+            "task_id": f"wtask_{int(time.time()*1000)}",
+            "connection_id": cid,
+            "connection_type": self._connections[cid]["type"],
+            "device_type": self.cmb_device.currentText(),
+            "start_addr": self.spin_addr.value(),
+            "value": self.spin_value.value(),
+            "write_interval": self.spin_interval.value(),
+            "data_type": data_type,
+            "byte_order": byte_order,
+            "name": name,
+        }
+        self.write_task_added.emit(task_dict)
+        self.close()
+
+
 # ================================================================
 #  第八部分: 主窗口
 # ================================================================
@@ -1615,6 +2157,7 @@ class MainWindow(QMainWindow):
         self.worker = AcquisitionWorker(self.store)
         self._connections = {}
         self._tasks = []
+        self._write_tasks = []  # WriteTask 列表
         self._chart_widgets = {}
         self._channel_to_chart = {}
 
@@ -1636,8 +2179,8 @@ class MainWindow(QMainWindow):
         self._config_file = os.path.join(app_dir, "daq_config.yml")
         self._load_config()
 
-        # 软件启动时自动开始采集（如果已配置采集任务）
-        if self._tasks:
+        # 软件启动时自动开始采集（如果已配置采集任务或写入任务）
+        if self._tasks or self._write_tasks:
             self._on_start()
             self.status_bar.showMessage("已自动开始采集", 3000)
 
@@ -1650,6 +2193,8 @@ class MainWindow(QMainWindow):
         toolbar = QHBoxLayout()
         self.btn_add_conn = QPushButton("➕ 添加连接")
         self.btn_add_task = QPushButton("➕ 添加采集任务")
+        self.btn_add_write_task = QPushButton("✏ 添加写入任务")
+        self.btn_del_write_task = QPushButton("🗑 删除写入任务")
         self.btn_start = QPushButton("▶ 开始采集")
         self.btn_stop = QPushButton("⏹ 停止采集")
         self.btn_export = QPushButton("💾 导出CSV")
@@ -1663,6 +2208,8 @@ class MainWindow(QMainWindow):
 
         toolbar.addWidget(self.btn_add_conn)
         toolbar.addWidget(self.btn_add_task)
+        toolbar.addWidget(self.btn_add_write_task)
+        toolbar.addWidget(self.btn_del_write_task)
         toolbar.addSpacing(20)
         toolbar.addWidget(self.btn_start)
         toolbar.addWidget(self.btn_stop)
@@ -1713,6 +2260,20 @@ class MainWindow(QMainWindow):
         task_group.setLayout(task_layout)
         left_layout.addWidget(task_group)
 
+        write_group = QGroupBox("已配置写入任务")
+        write_layout = QVBoxLayout()
+        self.table_write = QTableWidget(0, 8)
+        self.table_write.setHorizontalHeaderLabels(
+            ["任务名称", "连接ID", "类型", "设备类型", "起始地址",
+             "写入值", "写入频率(s)", "状态"])
+        self.table_write.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table_write.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table_write.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table_write.setSelectionMode(QTableWidget.SingleSelection)
+        write_layout.addWidget(self.table_write)
+        write_group.setLayout(write_layout)
+        left_layout.addWidget(write_group)
+
         splitter.addWidget(left_panel)
 
         # 右: 图表
@@ -1753,6 +2314,8 @@ class MainWindow(QMainWindow):
     def _connect_signals(self):
         self.btn_add_conn.clicked.connect(self._on_add_connection)
         self.btn_add_task.clicked.connect(self._on_add_task)
+        self.btn_add_write_task.clicked.connect(self._on_add_write_task)
+        self.btn_del_write_task.clicked.connect(self._on_del_write_task)
         self.btn_start.clicked.connect(self._on_start)
         self.btn_stop.clicked.connect(self._on_stop)
         self.btn_export.clicked.connect(self._on_export)
@@ -1762,6 +2325,7 @@ class MainWindow(QMainWindow):
         self.worker.data_acquired.connect(self._on_data_acquired)
         self.worker.connection_status.connect(self._on_conn_status)
         self.worker.error_occurred.connect(self._on_error)
+        self.worker.write_status.connect(self._on_write_status)
         self.table_conn.cellChanged.connect(self._on_conn_cell_changed)
         self.table_task.cellChanged.connect(self._on_task_cell_changed)
 
@@ -1880,6 +2444,73 @@ class MainWindow(QMainWindow):
         self._ensure_chart_for_task(task)
         self.status_bar.showMessage(f"已添加采集任务: {task.channel_name}", 3000)
 
+    # ---- 写入任务管理 ----
+    @_safe_event
+    def _on_add_write_task(self):
+        if not self._connections:
+            QMessageBox.warning(self, "提示", "请先添加至少一个连接")
+            return
+        self._write_task_dialog = WriteTaskConfigDialog(self._connections)
+        self._write_task_dialog.write_task_added.connect(self._add_write_task)
+        self._write_task_dialog.show()
+
+    @_safe_event
+    def _add_write_task(self, task_dict):
+        task = WriteTask.from_dict(task_dict)
+        self._write_tasks.append(task)
+        self.worker.add_write_task(task)
+        self._refresh_write_table()
+        self.status_bar.showMessage(f"已添加写入任务: {task.name}", 3000)
+        # 若采集已在运行，写入任务添加后需重启 worker 以启动写入线程
+        if self.worker._running and self.worker._write_thread is None:
+            self.worker._write_thread = threading.Thread(
+                target=self.worker._run_write_loop, daemon=True)
+            self.worker._write_thread.start()
+
+    @_safe_event
+    def _on_del_write_task(self):
+        row = self.table_write.currentRow()
+        if row < 0 or row >= len(self._write_tasks):
+            QMessageBox.warning(self, "提示", "请先在写入任务表中选择要删除的任务")
+            return
+        task = self._write_tasks.pop(row)
+        self.worker.remove_write_task(task.task_id)
+        self._refresh_write_table()
+        self.status_bar.showMessage(f"已删除写入任务: {task.name}", 3000)
+
+    @_safe_event
+    def _on_write_status(self, task_id, success, message):
+        # 更新写入任务表中的"状态"列
+        for row, task in enumerate(self._write_tasks):
+            if task.task_id == task_id:
+                status_text = "✓ 成功" if success else "✗ 失败"
+                item = self.table_write.item(row, 7)
+                if item is None:
+                    item = QTableWidgetItem(status_text)
+                    self.table_write.setItem(row, 7, item)
+                else:
+                    item.setText(status_text)
+                color = QColor("#a6e3a1") if success else QColor("#f38ba8")
+                item.setForeground(color)
+                break
+        if not success:
+            self.status_bar.showMessage(f"写入任务失败 [{task_id}]: {message}", 5000)
+
+    @_safe_event
+    def _refresh_write_table(self):
+        self.table_write.blockSignals(True)
+        self.table_write.setRowCount(len(self._write_tasks))
+        for i, task in enumerate(self._write_tasks):
+            self.table_write.setItem(i, 0, QTableWidgetItem(task.name))
+            self.table_write.setItem(i, 1, QTableWidgetItem(task.connection_id))
+            self.table_write.setItem(i, 2, QTableWidgetItem(task.connection_type))
+            self.table_write.setItem(i, 3, QTableWidgetItem(task.device_type))
+            self.table_write.setItem(i, 4, QTableWidgetItem(str(task.start_addr)))
+            self.table_write.setItem(i, 5, QTableWidgetItem(str(task.value)))
+            self.table_write.setItem(i, 6, QTableWidgetItem(f"{task.write_interval:g}"))
+            self.table_write.setItem(i, 7, QTableWidgetItem("—"))
+        self.table_write.blockSignals(False)
+
     @_safe_event
     def _on_task_cell_changed(self, row, col):
         if row < 0 or row >= len(self._tasks):
@@ -1995,8 +2626,8 @@ class MainWindow(QMainWindow):
     # ---- 采集控制 ----
     @_safe_event
     def _on_start(self):
-        if not self._tasks:
-            QMessageBox.warning(self, "提示", "请先添加至少一个采集任务")
+        if not self._tasks and not self._write_tasks:
+            QMessageBox.warning(self, "提示", "请先添加至少一个采集任务或写入任务")
             return
         self.worker.set_poll_interval(self.spin_interval.value())
         self.worker.start()
@@ -2004,6 +2635,8 @@ class MainWindow(QMainWindow):
         self.btn_stop.setEnabled(True)
         self.btn_add_conn.setEnabled(False)
         self.btn_add_task.setEnabled(False)
+        self.btn_add_write_task.setEnabled(False)
+        self.btn_del_write_task.setEnabled(False)
         self.status_bar.showMessage("采集已启动", 3000)
 
     @_safe_event
@@ -2013,6 +2646,8 @@ class MainWindow(QMainWindow):
         self.btn_stop.setEnabled(False)
         self.btn_add_conn.setEnabled(True)
         self.btn_add_task.setEnabled(True)
+        self.btn_add_write_task.setEnabled(True)
+        self.btn_del_write_task.setEnabled(True)
         self.status_bar.showMessage("采集已停止", 3000)
 
     # ---- 事件回调 ----
@@ -2130,6 +2765,7 @@ class MainWindow(QMainWindow):
                 for cid, info in self._connections.items()
             },
             "tasks": [t.to_dict() for t in self._tasks],
+            "write_tasks": [t.to_dict() for t in self._write_tasks],
             "poll_interval": self.spin_interval.value(),
         }
         try:
@@ -2159,6 +2795,7 @@ class MainWindow(QMainWindow):
         self.worker.clear_all()
         self._connections.clear()
         self._tasks.clear()
+        self._write_tasks.clear()
         for chart in self._chart_widgets.values():
             chart.deleteLater()
         self._chart_widgets.clear()
@@ -2168,10 +2805,13 @@ class MainWindow(QMainWindow):
             self._add_connection(cid, info["type"], info["params"])
         for td in config.get("tasks", []):
             self._add_task(td)
+        for td in config.get("write_tasks", []):
+            self._add_write_task(td)
         self.spin_interval.setValue(config.get("poll_interval", 0.5))
 
         self._refresh_conn_table()
         self._refresh_task_table()
+        self._refresh_write_table()
         self.status_bar.showMessage("配置已加载", 3000)
 
     @_safe_event

@@ -1,6 +1,6 @@
 # ================================================================
 # 多通道工业数据采集系统 - 配置文件模板
-# 支持设备: Modbus TCP / Modbus RTU / Keyence PLC
+# 支持设备: Modbus TCP / Modbus RTU / Modbus ASCII / Keyence PLC
 # ================================================================
 
 # ---------------------------
@@ -14,7 +14,7 @@ poll_interval: 0.5
 # 设备连接配置
 # ---------------------------
 # 定义所有需要连接的设备
-# 支持的连接类型: modbus_tcp, modbus_rtu, keyence
+# 支持的连接类型: modbus_tcp, modbus_rtu, modbus_ascii, keyence
 connections:
   # Keyence PLC 示例
   keyence_plc1:
@@ -27,6 +27,22 @@ connections:
       port: 3000
       # PLC单元号（通常为0）
       unit: 0
+      # 通信超时（秒），默认3.0
+      timeout: 3.0
+
+  # Modbus TCP 设备示例（以太网）
+  modbus_tcp_device1:
+    # 连接类型: modbus_tcp
+    type: modbus_tcp
+    params:
+      # 设备IP地址
+      host: 192.168.1.100
+      # Modbus TCP端口（标准为502）
+      port: 502
+      # 从站地址（1-247）
+      slave_id: 1
+      # 通信超时（秒），默认1.0
+      timeout: 1.0
 
   # Modbus RTU 设备示例（串口）
   modbus_rtu_device1:
@@ -45,35 +61,46 @@ connections:
       stopbits: 1
       # 从站地址（1-247）
       slave_id: 1
+      # 通信超时（秒），默认1.0
+      timeout: 1.0
 
-  # Modbus TCP 设备示例（以太网）
-  modbus_tcp_device1:
-    # 连接类型: modbus_tcp
-    type: modbus_tcp
+  # Modbus ASCII 设备示例（串口 - ASCII编码）
+  modbus_ascii_device1:
+    # 连接类型: modbus_ascii
+    type: modbus_ascii
     params:
-      # 设备IP地址
-      host: 192.168.1.100
-      # Modbus TCP端口（标准为502）
-      port: 502
+      # 串口名称（Windows: COM1, COM2...; Linux: /dev/ttyUSB0...）
+      port: COM2
+      # 波特率（常用: 9600, 19200, 38400, 57600, 115200）
+      baudrate: 38400
+      # 数据位（7或8，ASCII模式通常为7）
+      bytesize: 7
+      # 校验位（N: 无校验, E: 偶校验, O: 奇校验）
+      parity: E
+      # 停止位（通常为1）
+      stopbits: 1
       # 从站地址（1-247）
       slave_id: 1
+      # 通信超时（秒），默认1.0
+      timeout: 1.0
 
 
 # ---------------------------
 # 采集任务配置
 # ---------------------------
 # 定义所有需要采集的数据点
-# 每个任务对应一个图表，可包含多个通道
+# 每个任务对应一个通道（或多个连续通道）
 tasks:
 # ====================
 # 字段说明:
 #   task_id:         任务唯一标识（不能重复）
 #   connection_id:   关联的连接名称（需在connections中定义）
-#   connection_type: 连接类型（modbus_tcp/modbus_rtu/keyence）
-#   device_type:     寄存器类型
+#   connection_type: 连接类型（modbus_tcp/modbus_rtu/modbus_ascii/keyence）
+#   device_type:     寄存器/设备类型
 #                    - modbus: holding(保持寄存器), input(输入寄存器),
 #                              coil(线圈), discrete_input(离散输入)
-#                    - keyence: DM(数据寄存器)
+#                    - keyence: DM(数据寄存器), MR(内部继电器), LR(链接寄存器),
+#                              TIM(定时器), CNT(计数器), VR(变址寄存器)
 #   start_addr:      起始地址（寄存器编号）
 #   quantity:        采集数量（连续寄存器个数）
 #   data_type:       数据类型
@@ -97,7 +124,7 @@ tasks:
 #   offset:          偏移量（工程值 = 原始值 × scale + offset）
 # ====================
 
-  # 示例1: 温度传感器（读取4个连续保持寄存器）
+  # 示例1: Modbus TCP 温度传感器（读取4个连续保持寄存器）
   - task_id: task_temp_sensor
     connection_id: modbus_tcp_device1
     connection_type: modbus_tcp
@@ -112,7 +139,7 @@ tasks:
     scale: 0.1
     offset: 0
 
-  # 示例2: 压力变送器（读取2个连续输入寄存器）
+  # 示例2: Modbus TCP 压力变送器（读取2个连续输入寄存器）
   - task_id: task_pressure
     connection_id: modbus_tcp_device1
     connection_type: modbus_tcp
@@ -127,7 +154,7 @@ tasks:
     scale: 0.001
     offset: 0
 
-  # 示例3: 数字输入（读取8个线圈）
+  # 示例3: Modbus TCP 数字输入（读取8个线圈）
   - task_id: task_digital_input
     connection_id: modbus_tcp_device1
     connection_type: modbus_tcp
@@ -142,7 +169,82 @@ tasks:
     scale: 1.0
     offset: 0
 
-  # 示例4: Keyence PLC DM寄存器（读取10个寄存器）
+  # 示例4: Modbus RTU 温控器当前温度（单寄存器读取）
+  - task_id: task_rtu_pv_ch1
+    connection_id: modbus_rtu_device1
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4100
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: pv_ch1
+    channel_name: CH1当前温度
+    unit: °C
+    scale: 0.1
+    offset: 0
+
+  # 示例5: Modbus RTU 温控器设定温度（写入用，读取设定值）
+  - task_id: task_rtu_sv_ch1
+    connection_id: modbus_rtu_device1
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4108
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: sv_ch1
+    channel_name: CH1设定温度
+    unit: °C
+    scale: 0.1
+    offset: 0
+
+  # 示例6: Modbus RTU 输出功率（单寄存器）
+  - task_id: task_rtu_out1_ch1
+    connection_id: modbus_rtu_device1
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4212
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: out1_ch1
+    channel_name: CH1输出功率1
+    unit: '%'
+    scale: 0.1
+    offset: 0
+
+  # 示例7: Modbus ASCII 温控器当前温度（单寄存器读取）
+  - task_id: task_ascii_pv_ch1
+    connection_id: modbus_ascii_device1
+    connection_type: modbus_ascii
+    device_type: holding
+    start_addr: 620
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: ascii_ch1
+    channel_name: ASCII通道1 PV值
+    unit: °C
+    scale: 0.1
+    offset: 0
+
+  # 示例8: Modbus ASCII 温控器设定温度
+  - task_id: task_ascii_sv_ch1
+    connection_id: modbus_ascii_device1
+    connection_type: modbus_ascii
+    device_type: holding
+    start_addr: 4
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: ascii_ch1
+    channel_name: ASCII通道1 SV值
+    unit: °C
+    scale: 0.1
+    offset: 0
+
+  # 示例9: Keyence PLC DM寄存器（读取10个连续寄存器）
   - task_id: task_keyence_dm
     connection_id: keyence_plc1
     connection_type: keyence
@@ -156,3 +258,87 @@ tasks:
     unit: ''
     scale: 1.0
     offset: 0
+
+  # 示例10: Keyence PLC LR寄存器（读取浮点数值）
+  - task_id: task_keyence_lr_float
+    connection_id: keyence_plc1
+    connection_type: keyence
+    device_type: LR
+    start_addr: 100
+    quantity: 1
+    data_type: float32
+    byte_order: abcd
+    channel_prefix: lr_float
+    channel_name: LR寄存器浮点值
+    unit: mm
+    scale: 1.0
+    offset: 0
+
+
+# ---------------------------
+# 写入任务配置（可选）
+# ---------------------------
+# 定义周期性向设备写入值的任务
+# 与 tasks 不同，write_tasks 会按照 write_interval 定时写入指定值
+write_tasks:
+# ====================
+# 字段说明:
+#   task_id:         任务唯一标识（不能重复）
+#   connection_id:   关联的连接名称（需在connections中定义）
+#   connection_type: 连接类型（modbus_tcp/modbus_rtu/modbus_ascii/keyence）
+#   device_type:     寄存器/设备类型（同tasks的device_type）
+#   start_addr:      起始地址（寄存器编号）
+#   value:           要写入的值（浮点数）
+#   write_interval:  写入频率（秒），即每隔多久写入一次
+#   data_type:       数据类型（同tasks的data_type）
+#   byte_order:      字节序（同tasks的byte_order）
+#   name:            任务显示名称（可选，默认"写{device_type}{start_addr}"）
+# ====================
+
+  # 示例1: Modbus RTU 写入设定温度
+  - task_id: wtask_rtu_sv_ch1
+    connection_id: modbus_rtu_device1
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4108
+    value: 25.0
+    write_interval: 1.0
+    data_type: uint16
+    byte_order: abcd
+    name: 写入CH1设定温度
+
+  # 示例2: Modbus TCP 写入控制寄存器
+  - task_id: wtask_tcp_ctrl
+    connection_id: modbus_tcp_device1
+    connection_type: modbus_tcp
+    device_type: holding
+    start_addr: 0
+    value: 1.0
+    write_interval: 0.5
+    data_type: uint16
+    byte_order: abcd
+    name: 写入控制值
+
+  # 示例3: Modbus ASCII 写入设定值
+  - task_id: wtask_ascii_sv
+    connection_id: modbus_ascii_device1
+    connection_type: modbus_ascii
+    device_type: holding
+    start_addr: 4
+    value: 0.0
+    write_interval: 1.0
+    data_type: uint16
+    byte_order: abcd
+    name: 写入ASCII设定值
+
+  # 示例4: Keyence PLC 写入 DM 寄存器
+  - task_id: wtask_keyence_dm
+    connection_id: keyence_plc1
+    connection_type: keyence
+    device_type: DM
+    start_addr: 0
+    value: 0.0
+    write_interval: 1.0
+    data_type: uint16
+    byte_order: abcd
+    name: 写入DM寄存器
