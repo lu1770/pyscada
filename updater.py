@@ -22,7 +22,12 @@ import urllib.request
 import urllib.error
 
 if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding="utf-8")
+    # 某些环境(IDE 输出面板、被重定向的 stdout)下 sys.stdout 不是
+    # 标准 TextIOWrapper，没有 reconfigure 方法，需要防御性调用。
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except (AttributeError, ValueError):
+        pass
 
 # ---------------- 配置 ----------------
 REMOTE_URL = "http://192.168.188.1:5244/d/dist/DAQ_System.exe?sign=0IO1c8pzrMamr9tPYI2wtFuAKrkvXa4kmwPREhDgsY8=:0"
