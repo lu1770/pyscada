@@ -1274,15 +1274,6 @@ class KeyencePLCConnector:
             print(f"[Keyence] 响应解析失败: {resp} (命令: {cmd})")
             return None
 
-    def read_dm(self, start_addr: int, count: int = 1):
-        return self.read_device("DM", start_addr, count)
-
-    def read_mr(self, start_addr: int, count: int = 1):
-        return self.read_device("MR", start_addr, count)
-
-    def read_lr(self, start_addr: int, count: int = 1):
-        return self.read_device("LR", start_addr, count)
-
     def write_device(self, device_type: str, start_addr: int,
                      value, data_type: str = "") -> bool:
         """

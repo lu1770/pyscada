@@ -233,7 +233,7 @@ tasks:
   scale: 0.1
   start_addr: 4215
   task_id: task_dte_out1_ch8
-  unit: ''
+  unit: '%'
 - byte_order: abcd
   channel_name: DTE_CH5输出功率2
   channel_prefix: out2_ch5
