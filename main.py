@@ -1244,17 +1244,27 @@ class KeyencePLCConnector:
         通用设备读取
         device_type: DM / MR / LR / TIM / CNT / VR 等
         data_type:   数据类型，如 "uint16", "float32" 等，用于生成类型后缀
-        命令格式: RD <设备类型><起始地址>.<数据类型后缀>[ <数量>]
-        示例:     RD DM6000.U      -> 从DM6000读取1个无符号16位值
-                  RD DM300.U 5     -> 从DM300读取5个无符号16位值
-                  RD DM300.F       -> 从DM300读取1个float32值
+
+        命令格式 (Keyence 上位链接协议):
+          - 读取1个点:   RD  <设备类型><起始地址>.<数据类型后缀>
+          - 读取多个点:  RDS <设备类型><起始地址>.<数据类型后缀> <数量>
+        示例:     RD DM6000.U        -> 从DM6000读取1个无符号16位值
+                  RDS DM300.U 5      -> 从DM300连续读取5个无符号16位值
+                  RD DM300.F         -> 从DM300读取1个float32值
+
+        注: RD 仅支持单点读取；count > 1 时必须使用 RDS（连续读取）命令，
+            否则 PLC 将返回 E1（命令异常）错误。
         """
         dt = device_type.upper()[:3]
         type_suffix = self.KEYENCE_TYPE_MAP.get(data_type.lower(), ".U")
+        # 不发送类型后缀：让 PLC 返回 16 位寄存器原始值，再由 _poll_one 中的
+        # ByteOrderDecoder 按 data_type/byte_order 本地解码（与 Modbus 路径一致，
+        # 且使 byte_order 配置对 Keyence 也生效）。
+        type_suffix = ''
         if count == 1:
             cmd = f"RD {dt}{start_addr}{type_suffix}"
         else:
-            cmd = f"RD {dt}{start_addr}{type_suffix} {count}"
+            cmd = f"RDS {dt}{start_addr}{type_suffix} {count}"
         resp = self._send_command(cmd)
         if resp is None:
             return None
@@ -1264,28 +1274,162 @@ class KeyencePLCConnector:
         values = resp.split()
         if not values:
             return None
-        
         try:
-            if type_suffix in (".F", ".LF", ".D", ".L", ".UD", ".UL"):
-                return [float(v) for v in values]
+            if type_suffix in (".F", ".LF"):
+                # return [float(v) for v in values]
+                output = [float(v) for v in values]
+                print(f"[Keyence] 命令: {cmd} 解析 {count} 个浮点数: {output}")
+                # 大端序
+                for v in output:
+                    output[k] = self._byte_order_decode(v, byte_order)
+                    k += 1
+                print(f"[Keyence] 命令: {cmd} 解析 {count} 个浮点数: {output}")
+                return output
+
             else:
-                return [int(v, 0) for v in values]
+                # PLC 返回 5 位零填充的十进制（如 "03932"），
+                # 不能用 int(v, 0)：base 0 会把前导零当成 Python 字面量而拒绝。
+                # 显式按十进制解析即可。
+                output = [int(v, 10) for v in values]
+                print(f"[Keyence] 命令: {cmd} 解析 {count} 个整数: {output}")
+                # 大端序
+                for v in output:
+                    output[k] = self._byte_order_decode(v, byte_order)
+                    k += 1
+                print(f"[Keyence] 命令: {cmd} 解析 {count} 个整数: {output}")
+                return output
         except ValueError:
             print(f"[Keyence] 响应解析失败: {resp} (命令: {cmd})")
             return None
 
+    def _byte_order_decode(self, value: str, byte_order: str) -> str:
+        """
+        对字节序进行解码，将大端序转换为小端序。
+        """
+        if byte_order == "big":
+            return value
+        elif byte_order == "little":
+            return value[::-1]
+        else:
+            raise ValueError(f"不支持的字节序: {byte_order}")
+
+    def read_dm(self, start_addr: int, count: int = 1):
+        return self.read_device("DM", start_addr, count)
+
+    def read_mr(self, start_addr: int, count: int = 1):
+        return self.read_device("MR", start_addr, count)
+
+    def read_lr(self, start_addr: int, count: int = 1):
+        return self.read_device("LR", start_addr, count)
+
+    @staticmethod
+    def parse_words(words: list, data_type: str = "float64",
+                    byte_order: str = "abcd"):
+        """
+        将 Keyence PLC 返回的 16 位寄存器值列表解析为指定数据类型的数值。
+
+        适用于调试或手动解析场景：将 RDS/RD 命令返回的原始十进制寄存器值
+        （如 [55050, 28835, 2621, 49202]）直接解码为目标数值。
+
+        Args:
+            words:      16 位寄存器值列表（十进制），如 [55050, 28835, 2621, 49202]
+            data_type:  目标数据类型，可选 "uint16"/"int16"/"uint32"/"int32"/
+                        "float32"/"uint64"/"int64"/"float64"
+            byte_order: 字节序，可选 "abcd"(大端)/"dcba"(小端)/"badc"(字内交换)/"cdab"(双字交换)
+
+        Returns:
+            解码后的数值列表（float），或在解析失败时返回 None
+
+        示例:
+            # 解析 LREAL (64位浮点, 4个寄存器)
+            val = KeyencePLCConnector.parse_words(
+                [55050, 28835, 2621, 49202], "float64", "abcd")
+
+            # 解析 REAL (32位浮点, 2个寄存器)
+            val = KeyencePLCConnector.parse_words(
+                [16286, 17225], "float32", "abcd")
+
+            # 解析 UDInt (32位无符号, 2个寄存器)
+            val = KeyencePLCConnector.parse_words(
+                [0, 1000], "uint32", "abcd")
+        """
+        try:
+            raw_bytes = b"".join(
+                struct.pack(">H", int(v) & 0xFFFF) for v in words)
+            return ByteOrderDecoder.decode(raw_bytes, data_type, byte_order)
+        except Exception as e:
+            print(f"[KeyencePLCConnector] 解析失败: {e}")
+            return None
+
+    @staticmethod
+    def parse_lreal(word_list: list, byte_order: str = "abcd"):
+        """
+        将 4 个 16 位寄存器值解析为 1 个 LREAL (64位 IEEE 754 双精度浮点数)。
+
+        Keyence PLC 的 LREAL 类型占用 4 个连续寄存器（8字节），
+        按高位寄存器在前的顺序返回。本方法支持 4 种字节序以适配
+        不同 PLC 型号或传输场景。
+
+        Args:
+            word_list:  4 个 16 位整数的列表，如 [55050, 28835, 2621, 49202]
+            byte_order: 字节序，默认 "abcd"（大端序，Keyence PLC 原生格式）
+                        "abcd" - 大端 (Big-Endian, ABCD) ：PLC 原生格式
+                        "dcba" - 小端 (Little-Endian, DCBA) ：x86 内存映射
+                        "badc" - 字内交换 (BADC) ：某些特殊格式
+                        "cdab" - 双字交换 (CDAB) ：另类字序
+
+        Returns:
+            解析后的浮点数值，或在解析失败时返回 None
+
+        示例:
+            >>> words = [55050, 28835, 2621, 49202]
+            >>> val = KeyencePLCConnector.parse_lreal(words)
+            >>> val = KeyencePLCConnector.parse_lreal(words, "dcba")
+        """
+        if len(word_list) != 4:
+            raise ValueError(
+                f"需要恰好 4 个 16 位整数来组成 LREAL (当前 {len(word_list)} 个)")
+        result = KeyencePLCConnector.parse_words(
+            word_list, "float64", byte_order)
+        if result and len(result) > 0:
+            return result[0]
+        return None
+
+    @staticmethod
+    def parse_real(word_list: list, byte_order: str = "abcd"):
+        """
+        将 2 个 16 位寄存器值解析为 1 个 REAL (32位 IEEE 754 单精度浮点数)。
+
+        Args:
+            word_list:  2 个 16 位整数的列表，如 [16286, 17225]
+            byte_order: 字节序，默认 "abcd"（大端序）
+
+        Returns:
+            解析后的浮点数值，或在解析失败时返回 None
+        """
+        if len(word_list) != 2:
+            raise ValueError(
+                f"需要恰好 2 个 16 位整数来组成 REAL (当前 {len(word_list)} 个)")
+        result = KeyencePLCConnector.parse_words(
+            word_list, "float32", byte_order)
+        if result and len(result) > 0:
+            return result[0]
+        return None
+
     def write_device(self, device_type: str, start_addr: int,
                      value, data_type: str = "") -> bool:
         """
-        通用设备写入（Keyence 上位链接协议 WT 命令）
+        通用设备写入（Keyence 上位链接协议 WR 命令）
         device_type: DM / MR / LR / TIM / CNT / VR 等
         data_type:   数据类型，用于生成类型后缀（同 read_device）
         value:       要写入的值（数字）
 
-        命令格式: WT <设备类型><起始地址>.<类型后缀> <值>
-        示例:     WT DM6000.U 100     -> 将100写入DM6000(无符号16位)
-                  WT DM300.F 3.14     -> 将3.14写入DM300(float32)
+        命令格式: WR <设备类型><起始地址>.<类型后缀> <值>
+        示例:     WR DM6000.U 100     -> 将100写入DM6000(无符号16位)
+                  WR DM300.F 3.14     -> 将3.14写入DM300(float32)
         返回 True 表示写入成功，False 表示失败。
+
+        注: 单点写入使用 WR；连续多点写入应使用 WRS（本方法仅支持单点）。
         """
         dt = device_type.upper()[:3]
         type_suffix = self.KEYENCE_TYPE_MAP.get(data_type.lower(), ".U")
@@ -1294,7 +1438,7 @@ class KeyencePLCConnector:
             value_str = f"{float(value)}"
         else:
             value_str = f"{int(round(float(value)))}"
-        cmd = f"WT {dt}{start_addr}{type_suffix} {value_str}"
+        cmd = f"WR {dt}{start_addr}{type_suffix} {value_str}"
         resp = self._send_command(cmd)
         if resp is None:
             return False
@@ -1583,7 +1727,19 @@ class AcquisitionWorker(QObject):
                     print(f"[ByteOrderDecoder] 解码失败: {e}")
                     return None
         elif isinstance(connector, KeyencePLCConnector):
-            return connector.read_device(task.device_type, task.start_addr, task.quantity, task.data_type)
+            raw_values = connector.read_device(task.device_type, task.start_addr, task.quantity, task.data_type)
+            if raw_values is None:
+                return None
+            try:
+                # Keyence 返回 16 位寄存器原始值列表（十进制），按 Modbus 约定
+                # （每个寄存器大端 2 字节）打包为原始字节，再用 ByteOrderDecoder
+                # 按 data_type/byte_order 解码：4 寄存器 -> 1 个 float64，
+                # 2 寄存器 -> 1 个 uint32，1 寄存器 -> 1 个 uint16，依此类推。
+                raw_bytes = b"".join(struct.pack(">H", int(v) & 0xFFFF) for v in raw_values)
+                return ByteOrderDecoder.decode(raw_bytes, task.data_type, task.byte_order)
+            except Exception as e:
+                print(f"[ByteOrderDecoder] 解码失败: {e}")
+                return None
         return None
 
     # ---- 写入循环 ----
