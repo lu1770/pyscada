@@ -1,0 +1,268 @@
+# ================================================================
+# 多通道工业数据采集系统 - 配置文件
+# 支持设备: Modbus RTU
+# ================================================================
+
+# ---------------------------
+# 全局配置
+# ---------------------------
+# 采集间隔（秒），控制轮询频率
+poll_interval: 0.5
+
+
+# ---------------------------
+# 设备连接配置
+# ---------------------------
+# 定义所有需要连接的设备
+# 支持的连接类型: modbus_rtu
+connections:
+  # Modbus RTU 温度采集设备
+  modbus_rtu_temp:
+    type: modbus_rtu
+    params:
+      # 串口名称
+      port: COM11
+      # 波特率（常用: 9600, 19200, 38400, 57600, 115200）
+      baudrate: 9600
+      # 数据位（通常为8）
+      bytesize: 8
+      # 校验位（N: 无校验, E: 偶校验, O: 奇校验）
+      parity: N
+      # 停止位（通常为1）
+      stopbits: 1
+      # 从站地址（1-247）
+      slave_id: 1
+      # 通信超时（秒），默认1.0
+      timeout: 1.0
+
+
+# ---------------------------
+# 采集任务配置
+# ---------------------------
+# 定义所有需要采集的数据点
+# 寄存器 0x00-0x0F 对应第 1-16 路温度，整型格式（uint16）
+tasks:
+  - task_id: task_temp_ch1
+    connection_id: modbus_rtu_temp
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x00
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: temp
+    channel_name: 第1路温度
+    unit: °C
+    scale: 0.01
+    offset: 0
+
+  - task_id: task_temp_ch2
+    connection_id: modbus_rtu_temp
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x01
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: temp
+    channel_name: 第2路温度
+    unit: °C
+    scale: 0.01
+    offset: 0
+
+  - task_id: task_temp_ch3
+    connection_id: modbus_rtu_temp
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x02
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: temp
+    channel_name: 第3路温度
+    unit: °C
+    scale: 0.01
+    offset: 0
+
+  - task_id: task_temp_ch4
+    connection_id: modbus_rtu_temp
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x03
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: temp
+    channel_name: 第4路温度
+    unit: °C
+    scale: 0.01
+    offset: 0
+
+  - task_id: task_temp_ch5
+    connection_id: modbus_rtu_temp
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x04
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: temp
+    channel_name: 第5路温度
+    unit: °C
+    scale: 0.01
+    offset: 0
+
+  - task_id: task_temp_ch6
+    connection_id: modbus_rtu_temp
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x05
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: temp
+    channel_name: 第6路温度
+    unit: °C
+    scale: 0.01
+    offset: 0
+
+  - task_id: task_temp_ch7
+    connection_id: modbus_rtu_temp
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x06
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: temp
+    channel_name: 第7路温度
+    unit: °C
+    scale: 0.01
+    offset: 0
+
+  - task_id: task_temp_ch8
+    connection_id: modbus_rtu_temp
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x07
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: temp
+    channel_name: 第8路温度
+    unit: °C
+    scale: 0.01
+    offset: 0
+
+  - task_id: task_temp_ch9
+    connection_id: modbus_rtu_temp
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x08
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: temp
+    channel_name: 第9路温度
+    unit: °C
+    scale: 0.01
+    offset: 0
+
+  - task_id: task_temp_ch10
+    connection_id: modbus_rtu_temp
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x09
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: temp
+    channel_name: 第10路温度
+    unit: °C
+    scale: 0.01
+    offset: 0
+
+  - task_id: task_temp_ch11
+    connection_id: modbus_rtu_temp
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x0A
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: temp
+    channel_name: 第11路温度
+    unit: °C
+    scale: 0.01
+    offset: 0
+
+  - task_id: task_temp_ch12
+    connection_id: modbus_rtu_temp
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x0B
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: temp
+    channel_name: 第12路温度
+    unit: °C
+    scale: 0.01
+    offset: 0
+
+  - task_id: task_temp_ch13
+    connection_id: modbus_rtu_temp
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x0C
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: temp
+    channel_name: 第13路温度
+    unit: °C
+    scale: 0.01
+    offset: 0
+
+  - task_id: task_temp_ch14
+    connection_id: modbus_rtu_temp
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x0D
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: temp
+    channel_name: 第14路温度
+    unit: °C
+    scale: 0.01
+    offset: 0
+
+  - task_id: task_temp_ch15
+    connection_id: modbus_rtu_temp
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x0E
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: temp
+    channel_name: 第15路温度
+    unit: °C
+    scale: 0.01
+    offset: 0
+
+  - task_id: task_temp_ch16
+    connection_id: modbus_rtu_temp
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x0F
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: temp
+    channel_name: 第16路温度
+    unit: °C
+    scale: 0.01
+    offset: 0
+
