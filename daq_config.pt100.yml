@@ -266,3 +266,182 @@ tasks:
     scale: 0.01
     offset: 0
 
+# ---------------------------
+# 写入任务配置（可选）
+# ---------------------------
+# 定义周期性向设备写入值的任务
+# 与 tasks 不同，write_tasks 会按照 write_interval 定时写入指定值
+write_tasks:
+# ====================
+# 字段说明:
+#   task_id:         任务唯一标识（不能重复）
+#   connection_id:   关联的连接名称（需在connections中定义）
+#   connection_type: 连接类型（modbus_tcp/modbus_rtu/modbus_ascii/keyence）
+#   device_type:     寄存器/设备类型（同tasks的device_type）
+#   start_addr:      起始地址（寄存器编号）
+#   value:           要写入的值（浮点数）
+#   write_interval:  写入频率（秒），即每隔多久写入一次
+#   data_type:       数据类型（同tasks的data_type）
+#   byte_order:      字节序（同tasks的byte_order）
+#   name:            任务显示名称（可选，默认"写{device_type}{start_addr}"）
+# ====================
+  - task_id: wtask_rtu_offset_ch1
+    connection_id: modbus_rtu_temp
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x16
+    value: 0.0
+    write_interval: 1.0
+    data_type: uint16
+    byte_order: abcd
+    name: 第1路温度偏移量修正，单位：0.1℃
+  - task_id: wtask_rtu_offset_ch2
+    connection_id: modbus_rtu_temp
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x17
+    value: 0.0
+    write_interval: 1.0
+    data_type: uint16
+    byte_order: abcd
+    name: 第2路温度偏移量修正，单位：0.1℃
+  - task_id: wtask_rtu_offset_ch3
+    connection_id: modbus_rtu_temp
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x18
+    value: 0.0
+    write_interval: 1.0
+    data_type: uint16
+    byte_order: abcd
+    name: 第3路温度偏移量修正，单位：0.1℃
+  - task_id: wtask_rtu_offset_ch4
+    connection_id: modbus_rtu_temp
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x19
+    value: 0.0
+    write_interval: 1.0
+    data_type: uint16
+    byte_order: abcd
+    name: 第4路温度偏移量修正，单位：0.1℃
+  - task_id: wtask_rtu_offset_ch5
+    connection_id: modbus_rtu_temp
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x1A
+    value: 0.0
+    write_interval: 1.0
+    data_type: uint16
+    byte_order: abcd
+    name: 第5路温度偏移量修正，单位：0.1℃
+  - task_id: wtask_rtu_offset_ch6
+    connection_id: modbus_rtu_temp
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x1B
+    value: 0.0
+    write_interval: 1.0
+    data_type: uint16
+    byte_order: abcd
+    name: 第6路温度偏移量修正，单位：0.1℃
+  - task_id: wtask_rtu_offset_ch7
+    connection_id: modbus_rtu_temp
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x1C
+    value: 0.0
+    write_interval: 1.0
+    data_type: uint16
+    byte_order: abcd
+    name: 第7路温度偏移量修正，单位：0.1℃
+  - task_id: wtask_rtu_offset_ch8
+    connection_id: modbus_rtu_temp
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x1D
+    value: 0.0
+    write_interval: 1.0
+    data_type: uint16
+    byte_order: abcd
+    name: 第8路温度偏移量修正，单位：0.1℃
+  - task_id: wtask_rtu_offset_ch9
+    connection_id: modbus_rtu_temp
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x1E
+    value: 0.0
+    write_interval: 1.0
+    data_type: uint16
+    byte_order: abcd
+    name: 第9路温度偏移量修正，单位：0.1℃
+  - task_id: wtask_rtu_offset_ch10
+    connection_id: modbus_rtu_temp
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x1F
+    value: 0.0
+    write_interval: 1.0
+    data_type: uint16
+    byte_order: abcd
+    name: 第10路温度偏移量修正，单位：0.1℃
+  - task_id: wtask_rtu_offset_ch11
+    connection_id: modbus_rtu_temp
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x20
+    value: 0.0
+    write_interval: 1.0
+    data_type: uint16
+    byte_order: abcd
+    name: 第11路温度偏移量修正，单位：0.1℃
+  - task_id: wtask_rtu_offset_ch12
+    connection_id: modbus_rtu_temp
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x21
+    value: 0.0
+    write_interval: 1.0
+    data_type: uint16
+    byte_order: abcd
+    name: 第12路温度偏移量修正，单位：0.1℃
+  - task_id: wtask_rtu_offset_ch13
+    connection_id: modbus_rtu_temp
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x22
+    value: 0.0
+    write_interval: 1.0
+    data_type: uint16
+    byte_order: abcd
+    name: 第13路温度偏移量修正，单位：0.1℃
+  - task_id: wtask_rtu_offset_ch14
+    connection_id: modbus_rtu_temp
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x23
+    value: 0.0
+    write_interval: 1.0
+    data_type: uint16
+    byte_order: abcd
+    name: 第14路温度偏移量修正，单位：0.1℃
+  - task_id: wtask_rtu_offset_ch15
+    connection_id: modbus_rtu_temp
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x24
+    value: 0.0
+    write_interval: 1.0
+    data_type: uint16
+    byte_order: abcd
+    name: 第15路温度偏移量修正，单位：0.1℃
+  - task_id: wtask_rtu_offset_ch16
+    connection_id: modbus_rtu_temp
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x25
+    value: 0.0
+    write_interval: 1.0
+    data_type: uint16
+    byte_order: abcd
+    name: 第16路温度偏移量修正，单位：0.1℃
