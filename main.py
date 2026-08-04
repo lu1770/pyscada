@@ -1406,11 +1406,13 @@ class KeyencePLCConnector:
         cmd = f"WR {dt}{start_addr}{type_suffix} {value_str}"
         resp = self._send_command(cmd)
         if resp is None:
+            print(f"[Keyence] PLC写入超时: {cmd}")
             return False
         if resp.startswith("E"):
             print(f"[Keyence] PLC写入错误: {resp} (命令: {cmd})")
             return False
         # 成功响应为 "OK" 或空字符串（视型号而定），不含 'E' 即视为成功
+        print(f"[Keyence] PLC写入成功: {resp} (命令: {cmd})")
         return True
 
 
@@ -1747,6 +1749,7 @@ class AcquisitionWorker(QObject):
             if not connector.connect():
                 return False, "设备未连接且重连失败"
         try:
+            print(f"[写入] 开始写入: {task.value} 到 {task.connection_id}")
             if isinstance(connector, (ModbusTCPConnector, ModbusRTUConnector, ModbusASCIIConnector)):
                 if task.device_type == "coil":
                     # 线圈：value 非0视为 ON
@@ -1770,6 +1773,7 @@ class AcquisitionWorker(QObject):
                     return True, f"写入成功: {task.value}"
                 return False, "写入失败（PLC返回错误或无响应）"
             else:
+                print(f"[警告] 不支持的连接器类型: {type(connector).__name__}")
                 return False, f"不支持的连接器类型: {type(connector).__name__}"
         except Exception as e:
             # 完整 traceback 写入日志，调用方仅接收简短信息

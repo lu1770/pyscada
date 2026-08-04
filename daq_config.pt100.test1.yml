@@ -16,7 +16,6 @@ poll_interval: 0.5
 # 定义所有需要连接的设备
 # 支持的连接类型: modbus_rtu
 connections:
-  # Modbus RTU 温度采集设备
   pt100_rtu_com11:
     type: modbus_rtu
     params:
@@ -32,6 +31,24 @@ connections:
       stopbits: 1
       # 从站地址（1-247）
       slave_id: 0
+      # 通信超时（秒），默认1.0
+      timeout: 1.0
+
+  dte_rtu_com9:
+    type: modbus_rtu
+    params:
+      # 串口名称
+      port: COM9
+      # 波特率（常用: 9600, 19200, 38400, 57600, 115200）
+      baudrate: 115200
+      # 数据位（通常为8）
+      bytesize: 8
+      # 校验位（N: 无校验, E: 偶校验, O: 奇校验）
+      parity: E
+      # 停止位（通常为1）
+      stopbits: 1
+      # 从站地址（1-247）
+      slave_id: 1
       # 通信超时（秒），默认1.0
       timeout: 1.0
 
@@ -334,6 +351,110 @@ tasks:
     unit: '%'
     scale: 1.0
     offset: 0
+  - byte_order: abcd
+    channel_name: CH1输出功率1
+    channel_prefix: out1_ch1
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4208
+    task_id: task_out1_ch1
+    unit: '%'
+  - byte_order: abcd
+    channel_name: CH2输出功率1
+    channel_prefix: out1_ch2
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4209
+    task_id: task_out1_ch2
+    unit: '%'
+  - byte_order: abcd
+    channel_name: CH3输出功率1
+    channel_prefix: out1_ch3
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4210
+    task_id: task_out1_ch3
+    unit: '%'
+  - byte_order: abcd
+    channel_name: CH4输出功率1
+    channel_prefix: out1_ch4
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4211
+    task_id: task_out1_ch4
+    unit: '%'
+  - byte_order: abcd
+    channel_name: CH5输出功率1
+    channel_prefix: out1_ch5
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4212
+    task_id: task_out1_ch5
+    unit: '%'
+  - byte_order: abcd
+    channel_name: CH6输出功率1
+    channel_prefix: out1_ch6
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4213
+    task_id: task_out1_ch6
+    unit: '%'
+  - byte_order: abcd
+    channel_name: CH7输出功率1
+    channel_prefix: out1_ch7
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4214
+    task_id: task_out1_ch7
+    unit: '%'
+  - byte_order: abcd
+    channel_name: CH8输出功率1
+    channel_prefix: out1_ch8
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4215
+    task_id: task_out1_ch8
+    unit: '%'
 
 # ---------------------------
 # 写入任务配置（可选）
@@ -520,18 +641,18 @@ write_tasks:
   # 中层上面中间两个加热棒占空比地址:DM15104
   # 上层中间两个加热棒占空比地址:DM15106
 
-  - task_id: wtask_keyence_dm
+  - task_id: wtask_keyence_dm1
     connection_id: keyence_pwm_plc1
     connection_type: keyence
     device_type: DM
     start_addr: 15100
-    value: 50.0
+    value: 10.0
     write_interval: 1.0
     data_type: uint16
     byte_order: abcd
     name: 写入下层中间两个加热棒占空比
 
-  - task_id: wtask_keyence_dm
+  - task_id: wtask_keyence_dm2
     connection_id: keyence_pwm_plc1
     connection_type: keyence
     device_type: DM
@@ -542,7 +663,7 @@ write_tasks:
     byte_order: abcd
     name: 写入中层下面中间两个加热棒占空比
   
-  - task_id: wtask_keyence_dm
+  - task_id: wtask_keyence_dm3
     connection_id: keyence_pwm_plc1
     connection_type: keyence
     device_type: DM
@@ -553,7 +674,7 @@ write_tasks:
     byte_order: abcd
     name: 写入中层上面中间两个加热棒占空比
   
-  - task_id: wtask_keyence_dm
+  - task_id: wtask_keyence_dm4
     connection_id: keyence_pwm_plc1
     connection_type: keyence
     device_type: DM
