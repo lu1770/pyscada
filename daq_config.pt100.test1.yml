@@ -514,3 +514,52 @@ write_tasks:
   #   data_type: int16
   #   byte_order: abcd
   #   name: 第16路偏移量修正，单位：0.1℃
+
+  # 下层中间两个加热棒占空比地址:DM15100
+  # 中层下面中间两个加热棒占空比地址:DM15102
+  # 中层上面中间两个加热棒占空比地址:DM15104
+  # 上层中间两个加热棒占空比地址:DM15106
+
+  - task_id: wtask_keyence_dm
+    connection_id: keyence_pwm_plc1
+    connection_type: keyence
+    device_type: DM
+    start_addr: 15100
+    value: 50.0
+    write_interval: 1.0
+    data_type: uint16
+    byte_order: abcd
+    name: 写入下层中间两个加热棒占空比
+
+  - task_id: wtask_keyence_dm
+    connection_id: keyence_pwm_plc1
+    connection_type: keyence
+    device_type: DM
+    start_addr: 15102
+    value: 50.0
+    write_interval: 1.0
+    data_type: uint16
+    byte_order: abcd
+    name: 写入中层下面中间两个加热棒占空比
+  
+  - task_id: wtask_keyence_dm
+    connection_id: keyence_pwm_plc1
+    connection_type: keyence
+    device_type: DM
+    start_addr: 15104
+    value: 50.0
+    write_interval: 1.0
+    data_type: uint16
+    byte_order: abcd
+    name: 写入中层上面中间两个加热棒占空比
+  
+  - task_id: wtask_keyence_dm
+    connection_id: keyence_pwm_plc1
+    connection_type: keyence
+    device_type: DM
+    start_addr: 15106
+    value: 50.0
+    write_interval: 1.0
+    data_type: uint16
+    byte_order: abcd
+    name: 写入上层中间两个加热棒占空比

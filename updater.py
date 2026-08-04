@@ -31,7 +31,7 @@ if sys.platform == "win32":
 
 # ---------------- 配置 ----------------
 REMOTE_URL = "http://192.168.188.1:5244/d/dist/DAQ_System.exe?sign=0IO1c8pzrMamr9tPYI2wtFuAKrkvXa4kmwPREhDgsY8=:0"
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.join(os.path.expanduser("~"), "Downloads")
 LOCAL_EXE = os.path.join(BASE_DIR, "DAQ_System.exe")
 STATE_FILE = os.path.join(BASE_DIR, ".updater_state.json")
 TIMEOUT = 15  # 网络 HEAD 超时(秒)
