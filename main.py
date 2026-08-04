@@ -1640,7 +1640,6 @@ class AcquisitionWorker(QObject):
 
         # 主循环
         while self._running:
-            loop_start = time.time()
             for task in self._tasks:
                 if not self._running:
                     break
@@ -1668,8 +1667,7 @@ class AcquisitionWorker(QObject):
                                    source=f"采集异常[{task.connection_id}]")
                     self.error_occurred.emit(task.connection_id, str(e))
 
-            elapsed = time.time() - loop_start
-            time.sleep(max(0, self._poll_interval - elapsed))
+            time.sleep(self._poll_interval)
 
         # 清理
         for conn_id, info in self._connections.items():
