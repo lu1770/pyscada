@@ -1,0 +1,516 @@
+# ================================================================
+# 多通道工业数据采集系统 - 配置文件
+# 支持设备: Modbus RTU
+# ================================================================
+
+# ---------------------------
+# 全局配置
+# ---------------------------
+# 采集间隔（秒），控制轮询频率
+poll_interval: 0.5
+
+
+# ---------------------------
+# 设备连接配置
+# ---------------------------
+# 定义所有需要连接的设备
+# 支持的连接类型: modbus_rtu
+connections:
+  # Modbus RTU 温度采集设备
+  pt100_rtu_com11:
+    type: modbus_rtu
+    params:
+      # 串口名称
+      port: COM11
+      # 波特率（常用: 9600, 19200, 38400, 57600, 115200）
+      baudrate: 9600
+      # 数据位（通常为8）
+      bytesize: 8
+      # 校验位（N: 无校验, E: 偶校验, O: 奇校验）
+      parity: N
+      # 停止位（通常为1）
+      stopbits: 1
+      # 从站地址（1-247）
+      slave_id: 0
+      # 通信超时（秒），默认1.0
+      timeout: 1.0
+
+  keyence_pwm_plc1:
+    # 连接类型: keyence
+    type: keyence
+    params:
+      # PLC 主机IP地址
+      host: 192.168.2.80
+      # Keyence 协议端口（通常为3000）
+      port: 8501
+      # PLC单元号（通常为0）
+      unit: 0
+      # 通信超时（秒），默认3.0
+      timeout: 3.0
+
+
+# ---------------------------
+# 采集任务配置
+# ---------------------------
+# 定义所有需要采集的数据点
+# 寄存器 0x00-0x0F 对应第 1-16 路温度，整型格式（uint16）
+tasks:
+  - task_id: task_temp_ch1
+    connection_id: pt100_rtu_com11
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x00
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: temp
+    channel_name: 第1路温度
+    unit: °C
+    scale: 0.01
+    offset: 0
+
+  - task_id: task_temp_ch2
+    connection_id: pt100_rtu_com11
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x01
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: temp
+    channel_name: 第2路温度
+    unit: °C
+    scale: 0.01
+    offset: 0
+
+  - task_id: task_temp_ch3
+    connection_id: pt100_rtu_com11
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x02
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: temp
+    channel_name: 第3路温度
+    unit: °C
+    scale: 0.01
+    offset: 0
+
+  - task_id: task_temp_ch4
+    connection_id: pt100_rtu_com11
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x03
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: temp
+    channel_name: 第4路温度
+    unit: °C
+    scale: 0.01
+    offset: 0
+
+  - task_id: task_temp_ch5
+    connection_id: pt100_rtu_com11
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x04
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: temp
+    channel_name: 第5路温度
+    unit: °C
+    scale: 0.01
+    offset: 0
+
+  - task_id: task_temp_ch6
+    connection_id: pt100_rtu_com11
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x05
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: temp
+    channel_name: 第6路温度
+    unit: °C
+    scale: 0.01
+    offset: 0
+
+  # - task_id: task_temp_ch7
+  #   connection_id: pt100_rtu_com11
+  #   connection_type: modbus_rtu
+  #   device_type: holding
+  #   start_addr: 0x06
+  #   quantity: 1
+  #   data_type: uint16
+  #   byte_order: abcd
+  #   channel_prefix: temp
+  #   channel_name: 第7路温度
+  #   unit: °C
+  #   scale: 0.01
+  #   offset: 0
+
+  # - task_id: task_temp_ch8
+  #   connection_id: pt100_rtu_com11
+  #   connection_type: modbus_rtu
+  #   device_type: holding
+  #   start_addr: 0x07
+  #   quantity: 1
+  #   data_type: uint16
+  #   byte_order: abcd
+  #   channel_prefix: temp
+  #   channel_name: 第8路温度
+  #   unit: °C
+  #   scale: 0.01
+  #   offset: 0
+
+  # - task_id: task_temp_ch9
+  #   connection_id: pt100_rtu_com11
+  #   connection_type: modbus_rtu
+  #   device_type: holding
+  #   start_addr: 0x08
+  #   quantity: 1
+  #   data_type: uint16
+  #   byte_order: abcd
+  #   channel_prefix: temp
+  #   channel_name: 第9路温度
+  #   unit: °C
+  #   scale: 0.01
+  #   offset: 0
+
+  # - task_id: task_temp_ch10
+  #   connection_id: pt100_rtu_com11
+  #   connection_type: modbus_rtu
+  #   device_type: holding
+  #   start_addr: 0x09
+  #   quantity: 1
+  #   data_type: uint16
+  #   byte_order: abcd
+  #   channel_prefix: temp
+  #   channel_name: 第10路温度
+  #   unit: °C
+  #   scale: 0.01
+  #   offset: 0
+
+  # - task_id: task_temp_ch11
+  #   connection_id: pt100_rtu_com11
+  #   connection_type: modbus_rtu
+  #   device_type: holding
+  #   start_addr: 0x0A
+  #   quantity: 1
+  #   data_type: uint16
+  #   byte_order: abcd
+  #   channel_prefix: temp
+  #   channel_name: 第11路温度
+  #   unit: °C
+  #   scale: 0.01
+  #   offset: 0
+
+  # - task_id: task_temp_ch12
+  #   connection_id: pt100_rtu_com11
+  #   connection_type: modbus_rtu
+  #   device_type: holding
+  #   start_addr: 0x0B
+  #   quantity: 1
+  #   data_type: uint16
+  #   byte_order: abcd
+  #   channel_prefix: temp
+  #   channel_name: 第12路温度
+  #   unit: °C
+  #   scale: 0.01
+  #   offset: 0
+
+  # - task_id: task_temp_ch13
+  #   connection_id: pt100_rtu_com11
+  #   connection_type: modbus_rtu
+  #   device_type: holding
+  #   start_addr: 0x0C
+  #   quantity: 1
+  #   data_type: uint16
+  #   byte_order: abcd
+  #   channel_prefix: temp
+  #   channel_name: 第13路温度
+  #   unit: °C
+  #   scale: 0.01
+  #   offset: 0
+
+  # - task_id: task_temp_ch14
+  #   connection_id: pt100_rtu_com11
+  #   connection_type: modbus_rtu
+  #   device_type: holding
+  #   start_addr: 0x0D
+  #   quantity: 1
+  #   data_type: uint16
+  #   byte_order: abcd
+  #   channel_prefix: temp
+  #   channel_name: 第14路温度
+  #   unit: °C
+  #   scale: 0.01
+  #   offset: 0
+
+  # - task_id: task_temp_ch15
+  #   connection_id: pt100_rtu_com11
+  #   connection_type: modbus_rtu
+  #   device_type: holding
+  #   start_addr: 0x0E
+  #   quantity: 1
+  #   data_type: uint16
+  #   byte_order: abcd
+  #   channel_prefix: temp
+  #   channel_name: 第15路温度
+  #   unit: °C
+  #   scale: 0.01
+  #   offset: 0
+
+  # - task_id: task_temp_ch16
+  #   connection_id: pt100_rtu_com11
+  #   connection_type: modbus_rtu
+  #   device_type: holding
+  #   start_addr: 0x0F
+  #   quantity: 1
+  #   data_type: uint16
+  #   byte_order: abcd
+  #   channel_prefix: temp
+  #   channel_name: 第16路温度
+  #   unit: °C
+  #   scale: 0.01
+  #   offset: 0
+
+  # 任务1: 下层中间两个加热棒占空比
+  - task_id: heater_duty_lower_mid
+    connection_id: keyence_pwm_plc1
+    connection_type: keyence
+    device_type: DM
+    start_addr: 15100
+    quantity: 1
+    data_type: uint16
+    channel_prefix: lower_mid_heater
+    channel_name: 下层中间两个加热棒占空比
+    unit: '%'
+    scale: 1.0
+    offset: 0
+
+  # 任务2: 中层下面中间两个加热棒占空比
+  - task_id: heater_duty_mid_lower_mid
+    connection_id: keyence_pwm_plc1
+    connection_type: keyence
+    device_type: DM
+    start_addr: 15102
+    quantity: 1
+    data_type: uint16
+    channel_prefix: mid_lower_mid_heater
+    channel_name: 中层下面中间两个加热棒占空比
+    unit: '%'
+    scale: 1.0
+    offset: 0
+
+  # 任务3: 中层上面中间两个加热棒占空比
+  - task_id: heater_duty_mid_upper_mid
+    connection_id: keyence_pwm_plc1
+    connection_type: keyence
+    device_type: DM
+    start_addr: 15104
+    quantity: 1
+    data_type: uint16
+    channel_prefix: mid_upper_mid_heater
+    channel_name: 中层上面中间两个加热棒占空比
+    unit: '%'
+    scale: 1.0
+    offset: 0
+
+  # 任务4: 上层中间两个加热棒占空比
+  - task_id: heater_duty_upper_mid
+    connection_id: keyence_pwm_plc1
+    connection_type: keyence
+    device_type: DM
+    start_addr: 15106
+    quantity: 1
+    data_type: uint16
+    channel_prefix: upper_mid_heater
+    channel_name: 上层中间两个加热棒占空比
+    unit: '%'
+    scale: 1.0
+    offset: 0
+
+# ---------------------------
+# 写入任务配置（可选）
+# ---------------------------
+# 定义周期性向设备写入值的任务
+# 与 tasks 不同，write_tasks 会按照 write_interval 定时写入指定值
+write_tasks:
+# ====================
+# 字段说明:
+#   task_id:         任务唯一标识（不能重复）
+#   connection_id:   关联的连接名称（需在connections中定义）
+#   connection_type: 连接类型（modbus_tcp/modbus_rtu/modbus_ascii/keyence）
+#   device_type:     寄存器/设备类型（同tasks的device_type）
+#   start_addr:      起始地址（寄存器编号）
+#   value:           要写入的值（浮点数）
+#   write_interval:  写入频率（秒），即每隔多久写入一次
+#   data_type:       数据类型（同tasks的data_type）
+#   byte_order:      字节序（同tasks的byte_order）
+#   name:            任务显示名称（可选，默认"写{device_type}{start_addr}"）
+# ====================
+  - task_id: wtask_rtu_offset_ch1
+    connection_id: pt100_rtu_com11
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x16
+    value: 10.0
+    write_interval: 1.0
+    data_type: int16
+    byte_order: abcd
+    name: 第1路偏移量修正，单位：0.1℃
+  - task_id: wtask_rtu_offset_ch2
+    connection_id: pt100_rtu_com11
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x17
+    value: 10.0
+    write_interval: 1.0
+    data_type: int16
+    byte_order: abcd
+    name: 第2路偏移量修正，单位：0.1℃
+  - task_id: wtask_rtu_offset_ch3
+    connection_id: pt100_rtu_com11
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x18
+    value: 10.0
+    write_interval: 1.0
+    data_type: int16
+    byte_order: abcd
+    name: 第3路偏移量修正，单位：0.1℃
+  - task_id: wtask_rtu_offset_ch4
+    connection_id: pt100_rtu_com11
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x19
+    value: 10.0
+    write_interval: 1.0
+    data_type: int16
+    byte_order: abcd
+    name: 第4路偏移量修正，单位：0.1℃
+  - task_id: wtask_rtu_offset_ch5
+    connection_id: pt100_rtu_com11
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x1A
+    value: 10.0
+    write_interval: 1.0
+    data_type: int16
+    byte_order: abcd
+    name: 第5路偏移量修正，单位：0.1℃
+  - task_id: wtask_rtu_offset_ch6
+    connection_id: pt100_rtu_com11
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 0x1B
+    value: 10.0
+    write_interval: 1.0
+    data_type: int16
+    byte_order: abcd
+    name: 第6路偏移量修正，单位：0.1℃
+  # - task_id: wtask_rtu_offset_ch7
+  #   connection_id: pt100_rtu_com11
+  #   connection_type: modbus_rtu
+  #   device_type: holding
+  #   start_addr: 0x1C
+  #   value: 0.0
+  #   write_interval: 1.0
+  #   data_type: int16
+  #   byte_order: abcd
+  #   name: 第7路偏移量修正，单位：0.1℃
+  # - task_id: wtask_rtu_offset_ch8
+  #   connection_id: pt100_rtu_com11
+  #   connection_type: modbus_rtu
+  #   device_type: holding
+  #   start_addr: 0x1D
+  #   value: 0.0
+  #   write_interval: 1.0
+  #   data_type: int16
+  #   byte_order: abcd
+  #   name: 第8路偏移量修正，单位：0.1℃
+  # - task_id: wtask_rtu_offset_ch9
+  #   connection_id: pt100_rtu_com11
+  #   connection_type: modbus_rtu
+  #   device_type: holding
+  #   start_addr: 0x1E
+  #   value: 0.0
+  #   write_interval: 1.0
+  #   data_type: int16
+  #   byte_order: abcd
+  #   name: 第9路偏移量修正，单位：0.1℃
+  # - task_id: wtask_rtu_offset_ch10
+  #   connection_id: pt100_rtu_com11
+  #   connection_type: modbus_rtu
+  #   device_type: holding
+  #   start_addr: 0x1F
+  #   value: 0.0
+  #   write_interval: 1.0
+  #   data_type: int16
+  #   byte_order: abcd
+  #   name: 第10路偏移量修正，单位：0.1℃
+  # - task_id: wtask_rtu_offset_ch11
+  #   connection_id: pt100_rtu_com11
+  #   connection_type: modbus_rtu
+  #   device_type: holding
+  #   start_addr: 0x20
+  #   value: 0.0
+  #   write_interval: 1.0
+  #   data_type: int16
+  #   byte_order: abcd
+  #   name: 第11路偏移量修正，单位：0.1℃
+  # - task_id: wtask_rtu_offset_ch12
+  #   connection_id: pt100_rtu_com11
+  #   connection_type: modbus_rtu
+  #   device_type: holding
+  #   start_addr: 0x21
+  #   value: 0.0
+  #   write_interval: 1.0
+  #   data_type: int16
+  #   byte_order: abcd
+  #   name: 第12路偏移量修正，单位：0.1℃
+  # - task_id: wtask_rtu_offset_ch13
+  #   connection_id: pt100_rtu_com11
+  #   connection_type: modbus_rtu
+  #   device_type: holding
+  #   start_addr: 0x22
+  #   value: 0.0
+  #   write_interval: 1.0
+  #   data_type: int16
+  #   byte_order: abcd
+  #   name: 第13路偏移量修正，单位：0.1℃
+  # - task_id: wtask_rtu_offset_ch14
+  #   connection_id: pt100_rtu_com11
+  #   connection_type: modbus_rtu
+  #   device_type: holding
+  #   start_addr: 0x23
+  #   value: 0.0
+  #   write_interval: 1.0
+  #   data_type: int16
+  #   byte_order: abcd
+  #   name: 第14路偏移量修正，单位：0.1℃
+  # - task_id: wtask_rtu_offset_ch15
+  #   connection_id: pt100_rtu_com11
+  #   connection_type: modbus_rtu
+  #   device_type: holding
+  #   start_addr: 0x24
+  #   value: 0.0
+  #   write_interval: 1.0
+  #   data_type: int16
+  #   byte_order: abcd
+  #   name: 第15路偏移量修正，单位：0.1℃
+  # - task_id: wtask_rtu_offset_ch16
+  #   connection_id: pt100_rtu_com11
+  #   connection_type: modbus_rtu
+  #   device_type: holding
+  #   start_addr: 0x25
+  #   value: 0.0
+  #   write_interval: 1.0
+  #   data_type: int16
+  #   byte_order: abcd
+  #   name: 第16路偏移量修正，单位：0.1℃

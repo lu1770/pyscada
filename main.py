@@ -57,9 +57,10 @@ def _safe_event(func):
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
-        except Exception:
+        except Exception as e:
             tb_text = "".join(traceback.format_exc())
-            sys.stderr.write(f"\n[事件异常] {func.__qualname__}:\n{tb_text}\n")
+            _log_exception(type(e), e, e.__traceback__,
+                           source=f"事件异常[{func.__qualname__}]")
             try:
                 from PySide6.QtWidgets import QApplication
                 if QApplication.instance() is not None:
@@ -1275,52 +1276,16 @@ class KeyencePLCConnector:
         if not values:
             return None
         try:
-            if type_suffix in (".F", ".LF"):
-                # return [float(v) for v in values]
-                output = [float(v) for v in values]
-                print(f"[Keyence] 命令: {cmd} 解析 {count} 个浮点数: {output}")
-                # 大端序
-                for v in output:
-                    output[k] = self._byte_order_decode(v, byte_order)
-                    k += 1
-                print(f"[Keyence] 命令: {cmd} 解析 {count} 个浮点数: {output}")
-                return output
-
-            else:
-                # PLC 返回 5 位零填充的十进制（如 "03932"），
-                # 不能用 int(v, 0)：base 0 会把前导零当成 Python 字面量而拒绝。
-                # 显式按十进制解析即可。
-                output = [int(v, 10) for v in values]
-                print(f"[Keyence] 命令: {cmd} 解析 {count} 个整数: {output}")
-                # 大端序
-                for v in output:
-                    output[k] = self._byte_order_decode(v, byte_order)
-                    k += 1
-                print(f"[Keyence] 命令: {cmd} 解析 {count} 个整数: {output}")
-                return output
+            # PLC 返回 16 位寄存器原始值（5 位零填充十进制，如 "03932"）。
+            # 显式按十进制解析，避免前导零被 int(v, 0) 拒绝。
+            # 类型转换与字节序解码交给 _poll_one 中的 ByteOrderDecoder，
+            # 与 Modbus 路径保持一致。
+            output = [int(v, 10) for v in values]
+            print(f"[Keyence] 命令: {cmd} 读取 {count} 个寄存器原始值: {output}")
+            return output
         except ValueError:
             print(f"[Keyence] 响应解析失败: {resp} (命令: {cmd})")
             return None
-
-    def _byte_order_decode(self, value: str, byte_order: str) -> str:
-        """
-        对字节序进行解码，将大端序转换为小端序。
-        """
-        if byte_order == "big":
-            return value
-        elif byte_order == "little":
-            return value[::-1]
-        else:
-            raise ValueError(f"不支持的字节序: {byte_order}")
-
-    def read_dm(self, start_addr: int, count: int = 1):
-        return self.read_device("DM", start_addr, count)
-
-    def read_mr(self, start_addr: int, count: int = 1):
-        return self.read_device("MR", start_addr, count)
-
-    def read_lr(self, start_addr: int, count: int = 1):
-        return self.read_device("LR", start_addr, count)
 
     @staticmethod
     def parse_words(words: list, data_type: str = "float64",
@@ -1696,6 +1661,9 @@ class AcquisitionWorker(QObject):
                                 self.store.add_data(ch_ids[i], ts, float(v))
                                 self.data_acquired.emit(ch_ids[i], ts, float(v))
                 except Exception as e:
+                    # 完整 traceback 写入日志，UI 仅显示简短信息
+                    _log_exception(type(e), e, e.__traceback__,
+                                   source=f"采集异常[{task.connection_id}]")
                     self.error_occurred.emit(task.connection_id, str(e))
 
             elapsed = time.time() - loop_start
@@ -1804,6 +1772,9 @@ class AcquisitionWorker(QObject):
             else:
                 return False, f"不支持的连接器类型: {type(connector).__name__}"
         except Exception as e:
+            # 完整 traceback 写入日志，调用方仅接收简短信息
+            _log_exception(type(e), e, e.__traceback__,
+                           source=f"写入异常[{task.connection_id}]")
             return False, f"写入异常: {e}"
 
 
@@ -2322,7 +2293,7 @@ class MainWindow(QMainWindow):
         if getattr(sys, 'frozen', False):
             app_dir = os.path.dirname(sys.executable)
         else:
-            app_dir = os.path.dirname(os.path.abspath(__file__))
+            app_dir = os.path.join(os.path.expanduser("~"), "Downloads")
         self._config_file = os.path.join(app_dir, "daq_config.yml")
         self._load_config()
 
@@ -3013,10 +2984,24 @@ class _TeeStream:
             pass
 
 
+def _log_exception(exc_type, exc_value, exc_tb, source="未处理异常"):
+    """将异常完整 traceback 写入日志文件（经 stderr Tee 落盘）。
+
+    所有异常（主线程/工作线程/被捕获的处理异常）统一经此入口记录，
+    确保即使 GUI 或控制台不可用也能持久化完整堆栈。
+    日志通道本身故障时静默，避免抛出二次异常导致递归。"""
+    try:
+        tb_text = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+        sys.stderr.write(f"\n[{source}] {exc_type.__name__}: {exc_value}\n{tb_text}\n")
+    except Exception:
+        pass
+
+
 def _setup_file_logging():
-    """将 stdout/stderr 同时写入控制台和 logs/ 下的时间戳日志文件，
-    并安装全局异常钩子以捕获未处理异常。"""
-    log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+    """将 stdout/stderr 同时写入控制台和当前用户 Downloads/daq_logs 下的时间戳日志文件，
+    并安装全局异常钩子以捕获所有未处理异常（主线程与工作线程）。"""
+    # 日志写入当前 Windows 用户的 Downloads 文件夹下的 daq_logs 子目录
+    log_dir = os.path.join(os.path.expanduser("~"), "Downloads", "daq_logs")
     os.makedirs(log_dir, exist_ok=True)
     log_path = os.path.join(log_dir, f"daq_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
 
@@ -3031,8 +3016,8 @@ def _setup_file_logging():
     sys.stderr = _TeeStream(sys.stderr, log_file)
 
     def _excepthook(exc_type, exc_value, exc_tb):
-        # 先写日志（通过 stderr tee）
-        sys.stderr.write("".join(traceback.format_exception(exc_type, exc_value, exc_tb)))
+        # 先写日志（通过 stderr tee 落盘）
+        _log_exception(exc_type, exc_value, exc_tb, source="未处理异常")
         # 同时弹窗提示用户（GUI 环境）
         try:
             from PySide6.QtWidgets import QMessageBox
@@ -3042,6 +3027,17 @@ def _setup_file_logging():
             pass
 
     sys.excepthook = _excepthook
+
+    # 捕获工作线程中未处理的异常，确保完整 traceback 写入日志
+    def _threading_excepthook(args):
+        _log_exception(args.exc_type, args.exc_value, args.exc_traceback,
+                       source=f"线程异常[{args.thread.name}]")
+
+    try:
+        threading.excepthook = _threading_excepthook
+    except AttributeError:
+        # 老版本 Python 无 threading.excepthook（3.8 之前）
+        pass
 
 
 def main():
