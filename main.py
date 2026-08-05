@@ -1568,6 +1568,58 @@ class WriteTask:
 
 
 # ================================================================
+#  计算写入任务 — 将指定计算任务/采集任务的值周期性写入设备
+# ================================================================
+class CalcWriteTask:
+    """计算写入任务 — 读取指定 task_id 的实时值, 周期性写入设备
+
+    与 WriteTask 的区别: value 不是固定值, 而是从 source_task_id
+    (calc_task 或 polling_task) 动态读取的最新值.
+    """
+
+    _TYPE_TO_REGISTERS = WriteTask._TYPE_TO_REGISTERS
+
+    def __init__(self, task_id: str, source_task_id: str,
+                 connection_id: str, connection_type: str,
+                 device_type: str, start_addr: int,
+                 write_interval: float = 1.0,
+                 data_type: str = "uint16",
+                 byte_order: str = "abcd",
+                 name: str = ""):
+        self.task_id = task_id
+        self.source_task_id = source_task_id
+        self.connection_id = connection_id
+        self.connection_type = connection_type
+        self.device_type = device_type
+        self.start_addr = int(start_addr)
+        self.write_interval = float(write_interval)
+        self.data_type = data_type
+        self.byte_order = byte_order
+        self.name = name or f"写{device_type}{start_addr}"
+
+    def get_registers_per_value(self) -> int:
+        return self._TYPE_TO_REGISTERS.get(self.data_type.lower(), 1)
+
+    def to_dict(self):
+        return {
+            "task_id": self.task_id,
+            "source_task_id": self.source_task_id,
+            "connection_id": self.connection_id,
+            "connection_type": self.connection_type,
+            "device_type": self.device_type,
+            "start_addr": self.start_addr,
+            "write_interval": self.write_interval,
+            "data_type": self.data_type,
+            "byte_order": self.byte_order,
+            "name": self.name,
+        }
+
+    @classmethod
+    def from_dict(cls, d):
+        return cls(**d)
+
+
+# ================================================================
 #  计算任务 — 根据公式实时计算通道值
 # ================================================================
 class CalcTask:
@@ -1679,6 +1731,7 @@ class AcquisitionWorker(QObject):
         self._tasks = []
         self._write_tasks = []  # WriteTask 列表
         self._calc_tasks = []   # CalcTask 列表
+        self._calc_write_tasks = []  # CalcWriteTask 列表
         self._running = False
         self._poll_interval = 0.5
         self._thread = None
@@ -1687,6 +1740,8 @@ class AcquisitionWorker(QObject):
         self._write_next_time: dict = {}
         # task_id → PollingTask 映射 (用于公式变量解析)
         self._task_id_to_task: dict = {}
+        # task_id → CalcTask 映射 (用于动态值解析)
+        self._calc_task_id_to_task: dict = {}
 
     def add_connection(self, conn_id: str, conn_type: str, **kwargs):
         if conn_type == "modbus_tcp":
@@ -1714,6 +1769,7 @@ class AcquisitionWorker(QObject):
 
     def add_calc_task(self, task: CalcTask):
         self._calc_tasks.append(task)
+        self._calc_task_id_to_task[task.task_id] = task
         ch_ids = task.get_channel_ids()
         ch_names = task.get_channel_names()
         for cid, cname in zip(ch_ids, ch_names):
@@ -1724,6 +1780,7 @@ class AcquisitionWorker(QObject):
 
     def remove_calc_task(self, task_id: str):
         self._calc_tasks = [t for t in self._calc_tasks if t.task_id != task_id]
+        self._calc_task_id_to_task.pop(task_id, None)
 
     def add_write_task(self, task: WriteTask):
         self._write_tasks.append(task)
@@ -1732,12 +1789,21 @@ class AcquisitionWorker(QObject):
         self._write_tasks = [t for t in self._write_tasks if t.task_id != task_id]
         self._write_next_time.pop(task_id, None)
 
+    def add_calc_write_task(self, task: CalcWriteTask):
+        self._calc_write_tasks.append(task)
+
+    def remove_calc_write_task(self, task_id: str):
+        self._calc_write_tasks = [t for t in self._calc_write_tasks if t.task_id != task_id]
+        self._write_next_time.pop(task_id, None)
+
     def clear_all(self):
         self._tasks.clear()
         self._calc_tasks.clear()
         self._write_tasks.clear()
+        self._calc_write_tasks.clear()
         self._write_next_time.clear()
         self._task_id_to_task.clear()
+        self._calc_task_id_to_task.clear()
         for conn in self._connections.values():
             conn["connector"].disconnect()
         self._connections.clear()
@@ -1751,8 +1817,8 @@ class AcquisitionWorker(QObject):
         self._running = True
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
         self._thread.start()
-        # 启动写入线程（仅当存在写入任务时）
-        if self._write_tasks:
+        # 启动写入线程（存在写入任务或计算写入任务时）
+        if self._write_tasks or self._calc_write_tasks:
             self._write_thread = threading.Thread(target=self._run_write_loop, daemon=True)
             self._write_thread.start()
 
@@ -1912,6 +1978,40 @@ class AcquisitionWorker(QObject):
                     self.error_occurred.emit(calc_task.task_id, err_msg)
 
     # ---- 写入循环 ----
+    def _resolve_source_value(self, source_task_id: str) -> float:
+        """根据 source_task_id 解析最新值.
+        策略: 1) 匹配 polling task_id → 取第一个通道值
+               2) 匹配 calc task_id → 取其 channel_prefix 对应值
+               3) 匹配 channel_prefix → 查找通道值
+               4) 匹配完整 channel_id → 直接取值
+        找不到返回 None."""
+        # 策略1: polling task
+        polling_task = self._task_id_to_task.get(source_task_id)
+        if polling_task:
+            ch_ids = polling_task.get_channel_ids()
+            if ch_ids:
+                val = self.store.get_latest_value(ch_ids[0])
+                if val is not None:
+                    return val
+        # 策略2: calc task (channel_prefix 即通道ID)
+        calc_task = self._calc_task_id_to_task.get(source_task_id)
+        if calc_task:
+            ch_id = calc_task.channel_prefix
+            val = self.store.get_latest_value(ch_id)
+            if val is not None:
+                return val
+        # 策略3: 匹配 channel_prefix
+        channel_id = self.store.find_channel_by_prefix(source_task_id)
+        if channel_id:
+            val = self.store.get_latest_value(channel_id)
+            if val is not None:
+                return val
+        # 策略4: 匹配完整 channel_id
+        val = self.store.get_latest_value(source_task_id)
+        if val is not None:
+            return val
+        return None
+
     def _run_write_loop(self):
         """独立线程：按每个写入任务的频率周期性写入指定值。
         不同任务可有不同的写入频率；线程按 50ms 粒度检查到期任务。"""
@@ -1919,9 +2019,12 @@ class AcquisitionWorker(QObject):
         now = time.time()
         for t in self._write_tasks:
             self._write_next_time[t.task_id] = now
+        for t in self._calc_write_tasks:
+            self._write_next_time[t.task_id] = now
 
         while self._running:
             now = time.time()
+            # 处理固定值写入任务
             for task in list(self._write_tasks):
                 if not self._running:
                     break
@@ -1936,10 +2039,37 @@ class AcquisitionWorker(QObject):
                 self.write_status.emit(task.task_id, ok, msg)
                 # 安排下一次触发
                 self._write_next_time[task.task_id] = time.time() + max(0.05, task.write_interval)
+
+            # 处理计算写入任务 (动态解析值)
+            for task in list(self._calc_write_tasks):
+                if not self._running:
+                    break
+                next_t = self._write_next_time.get(task.task_id)
+                if next_t is None:
+                    self._write_next_time[task.task_id] = now
+                    continue
+                if now < next_t:
+                    continue
+                # 动态解析源值
+                value = self._resolve_source_value(task.source_task_id)
+                if value is None:
+                    self.write_status.emit(task.task_id, False,
+                                           f"源任务[{task.source_task_id}]无数据")
+                    self._write_next_time[task.task_id] = time.time() + max(0.05, task.write_interval)
+                    continue
+                # 使用解析到的值执行写入
+                ok, msg = self._write_one(task, value=value)
+                self.write_status.emit(task.task_id, ok, msg)
+                # 安排下一次触发
+                self._write_next_time[task.task_id] = time.time() + max(0.05, task.write_interval)
+
             time.sleep(0.05)
 
-    def _write_one(self, task: WriteTask):
-        """执行一次写入。返回 (success, message)"""
+    def _write_one(self, task, value=None):
+        """执行一次写入。返回 (success, message)
+        value 参数: 若提供则使用该值, 否则使用 task.value (用于 WriteTask)"""
+        if value is None:
+            value = task.value
         conn_info = self._connections.get(task.connection_id)
         if not conn_info:
             return False, f"连接ID '{task.connection_id}' 不存在"
@@ -1948,28 +2078,28 @@ class AcquisitionWorker(QObject):
             if not connector.connect():
                 return False, "设备未连接且重连失败"
         try:
-            print(f"[写入] 开始写入: {task.value} 到 {task.connection_id}")
+            print(f"[写入] 开始写入: {value} 到 {task.connection_id}")
             if isinstance(connector, (ModbusTCPConnector, ModbusRTUConnector, ModbusASCIIConnector)):
                 if task.device_type == "coil":
                     # 线圈：value 非0视为 ON
-                    ok = connector.write_single_coil(task.start_addr, bool(task.value))
+                    ok = connector.write_single_coil(task.start_addr, bool(value))
                 else:
                     # 保持寄存器：按数据类型/字节序编码后写入
                     # input 区域不可写，自动回退到 holding
-                    raw = ByteOrderDecoder.encode(task.value, task.data_type, task.byte_order)
+                    raw = ByteOrderDecoder.encode(value, task.data_type, task.byte_order)
                     # uint16/int16 单寄存器使用 0x06，其他多寄存器使用 0x10
                     if task.get_registers_per_value() == 1:
                         ok = connector.write_single_register(task.start_addr, int.from_bytes(raw, "big"))
                     else:
                         ok = connector.write_registers_raw(task.start_addr, raw)
                 if ok:
-                    return True, f"写入成功: {task.value}"
+                    return True, f"写入成功: {value}"
                 return False, "写入失败（设备返回异常或无响应）"
             elif isinstance(connector, KeyencePLCConnector):
                 ok = connector.write_device(task.device_type, task.start_addr,
-                                            task.value, task.data_type)
+                                            value, task.data_type)
                 if ok:
-                    return True, f"写入成功: {task.value}"
+                    return True, f"写入成功: {value}"
                 return False, "写入失败（PLC返回错误或无响应）"
             else:
                 print(f"[警告] 不支持的连接器类型: {type(connector).__name__}")
@@ -2607,6 +2737,165 @@ class CalcTaskConfigDialog(QWidget):
 
 
 # ================================================================
+#  计算写入任务配置对话框
+# ================================================================
+class CalcWriteTaskConfigDialog(QWidget):
+    """计算写入任务配置对话框 — 将指定任务的实时值写入设备"""
+    calc_write_task_added = Signal(dict)
+
+    def __init__(self, connections: dict, calc_tasks: list, polling_tasks: list):
+        super().__init__()
+        self._connections = connections
+        self._calc_tasks = calc_tasks
+        self._polling_tasks = polling_tasks
+        self.setWindowTitle("添加计算写入任务")
+        self.setWindowModality(Qt.ApplicationModal)
+        self.setMinimumWidth(520)
+        self._build_ui()
+
+    def _build_ui(self):
+        layout = QGridLayout(self)
+
+        # 源任务选择
+        layout.addWidget(QLabel("数据源任务:"), 0, 0)
+        self.cmb_source = QComboBox()
+        self._build_source_combo()
+        layout.addWidget(self.cmb_source, 0, 1)
+
+        # 所属连接
+        layout.addWidget(QLabel("写入连接:"), 1, 0)
+        self.cmb_conn = QComboBox()
+        for cid, info in self._connections.items():
+            label = f"{cid} ({info['type']})"
+            if info['type'] == 'modbus_tcp':
+                label += f" {info['params'].get('host','')}:{info['params'].get('port',502)}"
+            elif info['type'] in ['modbus_rtu', 'modbus_ascii']:
+                label += f" {info['params'].get('port','')} @ {info['params'].get('baudrate',9600)}"
+            self.cmb_conn.addItem(label, cid)
+        layout.addWidget(self.cmb_conn, 1, 1)
+
+        # 任务名称
+        layout.addWidget(QLabel("任务名称:"), 2, 0)
+        self.edit_name = QLineEdit("计算写入任务")
+        layout.addWidget(self.edit_name, 2, 1)
+
+        # 设备类型
+        layout.addWidget(QLabel("设备类型:"), 3, 0)
+        self.cmb_device = QComboBox()
+        layout.addWidget(self.cmb_device, 3, 1)
+
+        # 起始地址
+        layout.addWidget(QLabel("起始地址:"), 4, 0)
+        self.spin_addr = QSpinBox()
+        self.spin_addr.setRange(0, 999999)
+        layout.addWidget(self.spin_addr, 4, 1)
+
+        # 写入频率
+        layout.addWidget(QLabel("写入频率(秒):"), 5, 0)
+        self.spin_interval = QDoubleSpinBox()
+        self.spin_interval.setRange(0.05, 3600.0)
+        self.spin_interval.setSingleStep(0.1)
+        self.spin_interval.setDecimals(3)
+        self.spin_interval.setValue(1.0)
+        layout.addWidget(self.spin_interval, 5, 1)
+
+        # 数据类型
+        layout.addWidget(QLabel("数据类型:"), 6, 0)
+        self.cmb_data_type = QComboBox()
+        self.cmb_data_type.addItems([
+            "uint16", "int16", "uint32", "int32",
+            "float32", "uint64", "int64", "float64"
+        ])
+        self.cmb_data_type.setCurrentText("uint16")
+        layout.addWidget(self.cmb_data_type, 6, 1)
+
+        # 字节序
+        layout.addWidget(QLabel("字节序:"), 7, 0)
+        self.cmb_byte_order = QComboBox()
+        self.cmb_byte_order.addItems([
+            "abcd (大端)", "dcba (小端)",
+            "badc (双字节交换)", "cdab (四字交换)"
+        ])
+        self.cmb_byte_order.setCurrentText("abcd (大端)")
+        layout.addWidget(self.cmb_byte_order, 7, 1)
+
+        self.cmb_conn.currentIndexChanged.connect(self._on_conn_changed)
+        self._on_conn_changed()
+
+        btn_layout = QHBoxLayout()
+        btn_ok = QPushButton("确定")
+        btn_cancel = QPushButton("取消")
+        btn_ok.clicked.connect(self._on_ok)
+        btn_cancel.clicked.connect(self.close)
+        btn_layout.addWidget(btn_ok)
+        btn_layout.addWidget(btn_cancel)
+        layout.addLayout(btn_layout, 8, 0, 1, 2)
+
+    def _build_source_combo(self):
+        """构建源任务下拉列表, 包含计算任务和采集任务"""
+        self.cmb_source.clear()
+        self.cmb_source.addItem("--- 选择数据源 ---", "")
+        # 添加计算任务
+        if self._calc_tasks:
+            self.cmb_source.addItem("── 计算任务 ──", "")
+            for t in self._calc_tasks:
+                label = f"[calc] {t.task_id} → {t.channel_prefix} ({t.channel_name})"
+                self.cmb_source.addItem(label, t.task_id)
+        # 添加采集任务
+        if self._polling_tasks:
+            self.cmb_source.addItem("── 采集任务 ──", "")
+            for t in self._polling_tasks:
+                ch_ids = t.get_channel_ids()
+                label = f"[task] {t.task_id} → {ch_ids[0] if ch_ids else '?'} ({t.channel_name})"
+                self.cmb_source.addItem(label, t.task_id)
+        if not self._calc_tasks and not self._polling_tasks:
+            self.cmb_source.setItemText(0, "(无可用任务, 请先添加采集或计算任务)")
+
+    @_safe_event
+    def _on_conn_changed(self, *args):
+        cid = self.cmb_conn.currentData()
+        if cid is None:
+            return
+        info = self._connections.get(cid)
+        self.cmb_device.clear()
+        if info and info["type"] in ("modbus_tcp", "modbus_rtu", "modbus_ascii"):
+            self.cmb_device.addItems(["holding", "coil"])
+        elif info and info["type"] == "keyence":
+            self.cmb_device.addItems(["DM", "MR", "LR", "TIM", "CNT", "VR"])
+
+    @_safe_event
+    def _on_ok(self):
+        source_task_id = self.cmb_source.currentData()
+        if not source_task_id:
+            QMessageBox.warning(self, "警告", "请选择数据源任务")
+            return
+        cid = self.cmb_conn.currentData()
+        if cid is None:
+            QMessageBox.warning(self, "警告", "请选择写入连接")
+            return
+        name = self.edit_name.text().strip() or "计算写入任务"
+
+        data_type = self.cmb_data_type.currentText()
+        byte_order_text = self.cmb_byte_order.currentText()
+        byte_order = byte_order_text.split()[0]
+
+        task_dict = {
+            "task_id": f"calcwrite_{int(time.time()*1000)}",
+            "source_task_id": source_task_id,
+            "connection_id": cid,
+            "connection_type": self._connections[cid]["type"],
+            "device_type": self.cmb_device.currentText(),
+            "start_addr": self.spin_addr.value(),
+            "write_interval": self.spin_interval.value(),
+            "data_type": data_type,
+            "byte_order": byte_order,
+            "name": name,
+        }
+        self.calc_write_task_added.emit(task_dict)
+        self.close()
+
+
+# ================================================================
 #  第八部分: 主窗口
 # ================================================================
 class MainWindow(QMainWindow):
@@ -2623,6 +2912,7 @@ class MainWindow(QMainWindow):
         self._tasks = []
         self._write_tasks = []  # WriteTask 列表
         self._calc_tasks = []   # CalcTask 列表
+        self._calc_write_tasks = []  # CalcWriteTask 列表
         self._chart_widgets = {}
         self._channel_to_chart = {}
 
@@ -2645,7 +2935,7 @@ class MainWindow(QMainWindow):
         self._load_config()
 
         # 软件启动时自动开始采集（如果已配置采集任务或写入任务）
-        if self._tasks or self._write_tasks or self._calc_tasks:
+        if self._tasks or self._write_tasks or self._calc_tasks or self._calc_write_tasks:
             self._on_start()
             self.status_bar.showMessage("已自动开始采集", 3000)
 
@@ -2660,7 +2950,9 @@ class MainWindow(QMainWindow):
         self.btn_add_task = QPushButton("➕ 添加采集任务")
         self.btn_add_calc_task = QPushButton("ƒ 添加计算任务")
         self.btn_add_write_task = QPushButton("✏ 添加写入任务")
+        self.btn_add_calc_write_task = QPushButton("⇌ 计算值写入")
         self.btn_del_write_task = QPushButton("🗑 删除写入任务")
+        self.btn_del_calc_write_task = QPushButton("🗑 删除计算写入")
         self.btn_start = QPushButton("▶ 开始采集")
         self.btn_stop = QPushButton("⏹ 停止采集")
         self.btn_export = QPushButton("💾 导出CSV")
@@ -2676,7 +2968,9 @@ class MainWindow(QMainWindow):
         toolbar.addWidget(self.btn_add_task)
         toolbar.addWidget(self.btn_add_calc_task)
         toolbar.addWidget(self.btn_add_write_task)
+        toolbar.addWidget(self.btn_add_calc_write_task)
         toolbar.addWidget(self.btn_del_write_task)
+        toolbar.addWidget(self.btn_del_calc_write_task)
         toolbar.addSpacing(20)
         toolbar.addWidget(self.btn_start)
         toolbar.addWidget(self.btn_stop)
@@ -2760,6 +3054,21 @@ class MainWindow(QMainWindow):
         calc_group.setLayout(calc_layout)
         left_layout.addWidget(calc_group)
 
+        # 计算写入任务表格
+        cw_group = QGroupBox("已配置计算写入任务")
+        cw_layout = QVBoxLayout()
+        self.table_calc_write = QTableWidget(0, 8)
+        self.table_calc_write.setHorizontalHeaderLabels(
+            ["任务名称", "源任务ID", "连接ID", "设备类型", "起始地址",
+             "写入频率(s)", "数据类型", "状态"])
+        self.table_calc_write.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table_calc_write.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table_calc_write.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table_calc_write.setSelectionMode(QTableWidget.SingleSelection)
+        cw_layout.addWidget(self.table_calc_write)
+        cw_group.setLayout(cw_layout)
+        left_layout.addWidget(cw_group)
+
         splitter.addWidget(left_panel)
 
         # 右: 图表
@@ -2802,7 +3111,9 @@ class MainWindow(QMainWindow):
         self.btn_add_task.clicked.connect(self._on_add_task)
         self.btn_add_calc_task.clicked.connect(self._on_add_calc_task)
         self.btn_add_write_task.clicked.connect(self._on_add_write_task)
+        self.btn_add_calc_write_task.clicked.connect(self._on_add_calc_write_task)
         self.btn_del_write_task.clicked.connect(self._on_del_write_task)
+        self.btn_del_calc_write_task.clicked.connect(self._on_del_calc_write_task)
         self.btn_del_calc_task.clicked.connect(self._on_del_calc_task)
         self.btn_start.clicked.connect(self._on_start)
         self.btn_stop.clicked.connect(self._on_stop)
@@ -3034,19 +3345,33 @@ class MainWindow(QMainWindow):
 
     @_safe_event
     def _on_write_status(self, task_id, success, message):
-        # 更新写入任务表中的"状态"列
-        for row, task in enumerate(self._write_tasks):
+        # 先检查是否为计算写入任务
+        for row, task in enumerate(self._calc_write_tasks):
             if task.task_id == task_id:
-                status_text = "✓ 成功" if success else "✗ 失败"
-                item = self.table_write.item(row, 7)
+                status_text = "✓ 成功" if success else f"✗ {message}"
+                item = self.table_calc_write.item(row, 7)
                 if item is None:
                     item = QTableWidgetItem(status_text)
-                    self.table_write.setItem(row, 7, item)
+                    self.table_calc_write.setItem(row, 7, item)
                 else:
                     item.setText(status_text)
                 color = QColor("#a6e3a1") if success else QColor("#f38ba8")
                 item.setForeground(color)
                 break
+        else:
+            # 固定值写入任务
+            for row, task in enumerate(self._write_tasks):
+                if task.task_id == task_id:
+                    status_text = "✓ 成功" if success else "✗ 失败"
+                    item = self.table_write.item(row, 7)
+                    if item is None:
+                        item = QTableWidgetItem(status_text)
+                        self.table_write.setItem(row, 7, item)
+                    else:
+                        item.setText(status_text)
+                    color = QColor("#a6e3a1") if success else QColor("#f38ba8")
+                    item.setForeground(color)
+                    break
         if not success:
             self.status_bar.showMessage(f"写入任务失败 [{task_id}]: {message}", 5000)
 
@@ -3064,6 +3389,77 @@ class MainWindow(QMainWindow):
             self.table_write.setItem(i, 6, QTableWidgetItem(f"{task.write_interval:g}"))
             self.table_write.setItem(i, 7, QTableWidgetItem("—"))
         self.table_write.blockSignals(False)
+
+    # ---- 计算写入任务管理 ----
+    @_safe_event
+    def _on_add_calc_write_task(self):
+        if not self._connections:
+            QMessageBox.warning(self, "提示", "请先添加至少一个连接")
+            return
+        if not self._calc_tasks and not self._tasks:
+            QMessageBox.warning(self, "提示", "请先添加至少一个采集任务或计算任务 (计算写入任务需要引用数据源)")
+            return
+        self._calc_write_task_dialog = CalcWriteTaskConfigDialog(
+            self._connections, self._calc_tasks, self._tasks)
+        self._calc_write_task_dialog.calc_write_task_added.connect(self._add_calc_write_task)
+        self._calc_write_task_dialog.show()
+
+    @_safe_event
+    def _add_calc_write_task(self, task_dict):
+        task = CalcWriteTask.from_dict(task_dict)
+        self._calc_write_tasks.append(task)
+        self.worker.add_calc_write_task(task)
+        self._refresh_calc_write_table()
+        self.status_bar.showMessage(f"已添加计算写入任务: {task.name}", 3000)
+        # 若采集已在运行，需确保写入线程已启动
+        if self.worker._running and self.worker._write_thread is None:
+            self.worker._write_thread = threading.Thread(
+                target=self.worker._run_write_loop, daemon=True)
+            self.worker._write_thread.start()
+
+    @_safe_event
+    def _on_del_calc_write_task(self):
+        row = self.table_calc_write.currentRow()
+        if row < 0 or row >= len(self._calc_write_tasks):
+            QMessageBox.warning(self, "提示", "请先在计算写入任务表中选择要删除的任务")
+            return
+        task = self._calc_write_tasks.pop(row)
+        self.worker.remove_calc_write_task(task.task_id)
+        self._refresh_calc_write_table()
+        self.status_bar.showMessage(f"已删除计算写入任务: {task.name}", 3000)
+
+    @_safe_event
+    def _on_calc_write_status(self, task_id, success, message):
+        # 更新计算写入任务表中的"状态"列
+        for row, task in enumerate(self._calc_write_tasks):
+            if task.task_id == task_id:
+                status_text = "✓ 成功" if success else f"✗ {message}"
+                item = self.table_calc_write.item(row, 7)
+                if item is None:
+                    item = QTableWidgetItem(status_text)
+                    self.table_calc_write.setItem(row, 7, item)
+                else:
+                    item.setText(status_text)
+                color = QColor("#a6e3a1") if success else QColor("#f38ba8")
+                item.setForeground(color)
+                break
+        if not success:
+            self.status_bar.showMessage(f"计算写入任务失败 [{task_id}]: {message}", 5000)
+
+    @_safe_event
+    def _refresh_calc_write_table(self):
+        self.table_calc_write.blockSignals(True)
+        self.table_calc_write.setRowCount(len(self._calc_write_tasks))
+        for i, task in enumerate(self._calc_write_tasks):
+            self.table_calc_write.setItem(i, 0, QTableWidgetItem(task.name))
+            self.table_calc_write.setItem(i, 1, QTableWidgetItem(task.source_task_id))
+            self.table_calc_write.setItem(i, 2, QTableWidgetItem(task.connection_id))
+            self.table_calc_write.setItem(i, 3, QTableWidgetItem(task.device_type))
+            self.table_calc_write.setItem(i, 4, QTableWidgetItem(str(task.start_addr)))
+            self.table_calc_write.setItem(i, 5, QTableWidgetItem(f"{task.write_interval:g}"))
+            self.table_calc_write.setItem(i, 6, QTableWidgetItem(task.data_type))
+            self.table_calc_write.setItem(i, 7, QTableWidgetItem("—"))
+        self.table_calc_write.blockSignals(False)
 
     @_safe_event
     def _on_task_cell_changed(self, row, col):
@@ -3180,8 +3576,8 @@ class MainWindow(QMainWindow):
     # ---- 采集控制 ----
     @_safe_event
     def _on_start(self):
-        if not self._tasks and not self._write_tasks and not self._calc_tasks:
-            QMessageBox.warning(self, "提示", "请先添加至少一个采集任务、写入任务或计算任务")
+        if not self._tasks and not self._write_tasks and not self._calc_tasks and not self._calc_write_tasks:
+            QMessageBox.warning(self, "提示", "请先添加至少一个采集任务、写入任务、计算任务或计算写入任务")
             return
         self.worker.set_poll_interval(self.spin_interval.value())
         self.worker.start()
@@ -3191,7 +3587,9 @@ class MainWindow(QMainWindow):
         self.btn_add_task.setEnabled(False)
         self.btn_add_calc_task.setEnabled(False)
         self.btn_add_write_task.setEnabled(False)
+        self.btn_add_calc_write_task.setEnabled(False)
         self.btn_del_write_task.setEnabled(False)
+        self.btn_del_calc_write_task.setEnabled(False)
         self.btn_del_calc_task.setEnabled(False)
         self.status_bar.showMessage("采集已启动", 3000)
 
@@ -3204,7 +3602,9 @@ class MainWindow(QMainWindow):
         self.btn_add_task.setEnabled(True)
         self.btn_add_calc_task.setEnabled(True)
         self.btn_add_write_task.setEnabled(True)
+        self.btn_add_calc_write_task.setEnabled(True)
         self.btn_del_write_task.setEnabled(True)
+        self.btn_del_calc_write_task.setEnabled(True)
         self.btn_del_calc_task.setEnabled(True)
         self.status_bar.showMessage("采集已停止", 3000)
 
@@ -3325,6 +3725,7 @@ class MainWindow(QMainWindow):
             "tasks": [t.to_dict() for t in self._tasks],
             "calc_tasks": [t.to_dict() for t in self._calc_tasks],
             "write_tasks": [t.to_dict() for t in self._write_tasks],
+            "calc_write_tasks": [t.to_dict() for t in self._calc_write_tasks],
             "poll_interval": self.spin_interval.value(),
         }
         try:
@@ -3356,6 +3757,7 @@ class MainWindow(QMainWindow):
         self._tasks.clear()
         self._calc_tasks.clear()
         self._write_tasks.clear()
+        self._calc_write_tasks.clear()
         for chart in self._chart_widgets.values():
             chart.deleteLater()
         self._chart_widgets.clear()
@@ -3369,12 +3771,15 @@ class MainWindow(QMainWindow):
             self._add_calc_task(td)
         for td in config.get("write_tasks", []):
             self._add_write_task(td)
+        for td in config.get("calc_write_tasks", []):
+            self._add_calc_write_task(td)
         self.spin_interval.setValue(config.get("poll_interval", 0.5))
 
         self._refresh_conn_table()
         self._refresh_task_table()
         self._refresh_calc_table()
         self._refresh_write_table()
+        self._refresh_calc_write_table()
         self.status_bar.showMessage("配置已加载", 3000)
 
     @_safe_event

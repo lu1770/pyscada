@@ -388,3 +388,47 @@ calc_tasks:
     unit: '%'
     scale: 1.0
     offset: 0.0
+
+# ---------------------------
+# 计算写入任务配置
+# ---------------------------
+# 将指定计算任务/采集任务的实时值周期性写入设备
+# 与 write_tasks 的区别: 写入值不是固定的, 而是从 source_task_id 动态读取
+calc_write_tasks:
+# ====================
+# 字段说明:
+#   task_id:          任务唯一标识（不能重复）
+#   source_task_id:   数据源任务ID (calc_task 或 polling_task 的 task_id)
+#   connection_id:    关联的连接名称（需在connections中定义）
+#   connection_type:  连接类型（modbus_tcp/modbus_rtu/modbus_ascii/keyence）
+#   device_type:      寄存器/设备类型（同tasks的device_type）
+#   start_addr:       起始地址（寄存器编号）
+#   write_interval:   写入频率（秒），即每隔多久写入一次
+#   data_type:        数据类型（同tasks的data_type）
+#   byte_order:       字节序（同tasks的byte_order）
+#   name:             任务显示名称（可选，默认"写{device_type}{start_addr}"）
+# ====================
+
+  # 示例1: 将计算任务的结果写入 Modbus TCP 保持寄存器
+  - task_id: calcwrite_diff
+    source_task_id: calc_diff_half
+    connection_id: modbus_tcp_device1
+    connection_type: modbus_tcp
+    device_type: holding
+    start_addr: 100
+    write_interval: 1.0
+    data_type: uint16
+    byte_order: abcd
+    name: 写入通道差值
+
+  # 示例2: 将采集任务的值写入 Modbus RTU
+  - task_id: calcwrite_task_val
+    source_task_id: task_out2_ch8
+    connection_id: modbus_rtu_device1
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4100
+    write_interval: 0.5
+    data_type: float32
+    byte_order: abcd
+    name: 写入原始采集值

@@ -1,3 +1,39 @@
+calc_tasks:
+- channel_name: 计算通道1
+  channel_prefix: calc_ch1
+  formula: task_sv_ch1*10+170-task_temp_ch1
+  offset: 0.0
+  scale: 1.0
+  task_id: calc_1785919067200
+  unit: ''
+- channel_name: 计算通道2
+  channel_prefix: calc_ch2
+  formula: task_sv_ch2*10+task_temp_ch1-task_temp_ch2
+  offset: 0.0
+  scale: 1.0
+  task_id: calc_1785919067201
+  unit: ''
+calc_write_tasks:
+- byte_order: abcd
+  connection_id: dte_rtu_com9
+  connection_type: modbus_rtu
+  data_type: uint16
+  device_type: holding
+  name: 设置CH1设定温度SV
+  source_task_id: calc_1785919067200
+  start_addr: 4104
+  task_id: calcwrite_1785919993452
+  write_interval: 100.0
+- byte_order: abcd
+  connection_id: dte_rtu_com9
+  connection_type: modbus_rtu
+  data_type: uint16
+  device_type: holding
+  name: 设置CH2设定温度SV
+  source_task_id: calc_1785919067201
+  start_addr: 4105
+  task_id: calcwrite_1785919993453
+  write_interval: 100.0
 connections:
   dte_rtu_com9:
     params:
@@ -9,13 +45,6 @@ connections:
       stopbits: 1
       timeout: 1.0
     type: modbus_rtu
-  pwm_plc1:
-    params:
-      host: 192.168.2.80
-      port: 8501
-      timeout: 3.0
-      unit: 0
-    type: keyence
   pt100_rtu_com11:
     params:
       baudrate: 9600
@@ -26,6 +55,13 @@ connections:
       stopbits: 1
       timeout: 1.0
     type: modbus_rtu
+  pwm_plc1:
+    params:
+      host: 192.168.2.80
+      port: 8501
+      timeout: 3.0
+      unit: 0
+    type: keyence
 poll_interval: 1.0
 tasks:
 - byte_order: abcd
@@ -40,6 +76,32 @@ tasks:
   scale: 0.01
   start_addr: 0
   task_id: task_temp_ch1
+  unit: °C
+- byte_order: abcd
+  channel_name: CH1设定温度
+  channel_prefix: sv_ch1
+  connection_id: dte_rtu_com9
+  connection_type: modbus_rtu
+  data_type: uint16
+  device_type: holding
+  offset: 0
+  quantity: 1
+  scale: 0.1
+  start_addr: 4104
+  task_id: task_sv_ch1
+  unit: °C
+- byte_order: abcd
+  channel_name: CH2设定温度
+  channel_prefix: sv_ch2
+  connection_id: dte_rtu_com9
+  connection_type: modbus_rtu
+  data_type: uint16
+  device_type: holding
+  offset: 0
+  quantity: 1
+  scale: 0.1
+  start_addr: 4105
+  task_id: task_sv_ch2
   unit: °C
 - byte_order: abcd
   channel_name: 第2路温度
@@ -263,86 +325,6 @@ tasks:
   task_id: task_out1_ch8
   unit: '%'
 write_tasks:
-- task_id: wtask_dte_ch1_sv
-  connection_id: dte_rtu_com9
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 4104
-  value: 1950.0
-  write_interval: 1.0
-  data_type: uint16
-  byte_order: abcd
-  name: 设置CH1设定温度
-- task_id: wtask_dte_ch2_sv
-  connection_id: dte_rtu_com9
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 4105
-  value: 1950.0
-  write_interval: 1.0
-  data_type: uint16
-  byte_order: abcd
-  name: 设置CH2设定温度
-- task_id: wtask_dte_ch3_sv
-  connection_id: dte_rtu_com9
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 4106
-  value: 1500.0
-  write_interval: 1.0
-  data_type: uint16
-  byte_order: abcd
-  name: 设置CH3设定温度
-- task_id: wtask_dte_ch4_sv
-  connection_id: dte_rtu_com9
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 4107
-  value: 1950.0
-  write_interval: 1.0
-  data_type: uint16
-  byte_order: abcd
-  name: 设置CH4设定温度
-- task_id: wtask_dte_ch5_sv
-  connection_id: dte_rtu_com9
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 4108
-  value: 1950.0
-  write_interval: 1.0
-  data_type: uint16
-  byte_order: abcd
-  name: 设置CH5设定温度
-- task_id: wtask_dte_ch6_sv
-  connection_id: dte_rtu_com9
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 4109
-  value: 1950.0
-  write_interval: 1.0
-  data_type: uint16
-  byte_order: abcd
-  name: 设置CH6设定温度
-- task_id: wtask_dte_ch7_sv
-  connection_id: dte_rtu_com9
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 4110
-  value: 1950.0
-  write_interval: 1.0
-  data_type: uint16
-  byte_order: abcd
-  name: 设置CH7设定温度
-- task_id: wtask_dte_ch8_sv
-  connection_id: dte_rtu_com9
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 4111
-  value: 1950.0
-  write_interval: 1.0
-  data_type: uint16
-  byte_order: abcd
-  name: 设置CH8设定温度
 - byte_order: abcd
   connection_id: pt100_rtu_com11
   connection_type: modbus_rtu
