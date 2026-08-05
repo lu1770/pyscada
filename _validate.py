@@ -15,7 +15,12 @@ print('\n=== 写入任务 (write_tasks) ===')
 for t in c.get('write_tasks', []):
     print(f'  {t["task_id"]}: addr={t["start_addr"]}, value={t["value"]}, interval={t["write_interval"]}')
 
+print('\n=== 计算任务 (calc_tasks) ===')
+for t in c.get('calc_tasks', []):
+    print(f'  {t["task_id"]}: formula={t["formula"]}, ch={t["channel_name"]}')
+
 print('\n=== 验证通过 ===')
 print(f'连接数: {len(c.get("connections", {}))}')
 print(f'采集任务数: {len(c.get("tasks", []))}')
 print(f'写入任务数: {len(c.get("write_tasks", []))}')
+print(f'计算任务数: {len(c.get("calc_tasks", []))}')

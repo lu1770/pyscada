@@ -342,3 +342,49 @@ write_tasks:
     data_type: uint16
     byte_order: abcd
     name: 写入DM寄存器
+
+# ---------------------------
+# 计算任务配置
+# ---------------------------
+# 根据公式实时计算通道值, 结果将作为新通道显示在图表中
+# 公式中可引用: task_id / channel_prefix / channel_id
+# 支持运算符: +  -  *  /  %  **  ()
+# 支持函数: abs, min, max, sqrt, sin, cos, tan, log, exp, pow
+calc_tasks:
+# ====================
+# 字段说明:
+#   task_id:         任务唯一标识（不能重复）
+#   channel_prefix:  计算结果的通道ID（唯一, 用于图表和数据存储）
+#   channel_name:    通道显示名称
+#   formula:         计算公式, 变量引用采集任务的 task_id 或 channel_prefix
+#   unit:            单位
+#   scale:           缩放系数 (默认 1.0)
+#   offset:          偏移量 (默认 0.0)
+# ====================
+
+  # 示例1: 计算两个通道差值的一半
+  - task_id: calc_diff_half
+    channel_prefix: calc_diff_half
+    channel_name: 通道差之半
+    formula: "(task_out2_ch8 - task_out2_ch7) / 2"
+    unit: '%'
+    scale: 1.0
+    offset: 0.0
+
+  # 示例2: 计算多个通道的平均值
+  - task_id: calc_avg_4ch
+    channel_prefix: calc_avg_4ch
+    channel_name: 四通道平均值
+    formula: "(task_out2_ch5 + task_out2_ch6 + task_out2_ch7 + task_out2_ch8) / 4"
+    unit: '%'
+    scale: 1.0
+    offset: 0.0
+
+  # 示例3: 使用内置函数
+  - task_id: calc_max_ch
+    channel_prefix: calc_max_ch
+    channel_name: 通道最大值
+    formula: "max(task_out2_ch5, task_out2_ch6, task_out2_ch7, task_out2_ch8)"
+    unit: '%'
+    scale: 1.0
+    offset: 0.0

@@ -140,6 +140,27 @@ class DataStore:
                 return list(ch["timestamps"]), list(ch["values"])
             return [], []
 
+    def get_latest_value(self, channel_id: str) -> Optional[float]:
+        """获取通道的最新值"""
+        with self._lock:
+            ch = self._channels.get(channel_id)
+            if ch and ch["values"]:
+                return ch["values"][-1]
+            return None
+
+    def find_channel_by_prefix(self, prefix: str) -> Optional[str]:
+        """根据 channel_prefix 查找第一个匹配的 channel_id"""
+        with self._lock:
+            for cid in self._channels:
+                if cid.startswith(prefix):
+                    return cid
+            return None
+
+    def find_channels_by_prefix(self, prefix: str) -> list:
+        """根据 channel_prefix 查找所有匹配的 channel_id"""
+        with self._lock:
+            return [cid for cid in self._channels if cid.startswith(prefix)]
+
     def get_all_channel_ids(self):
         with self._lock:
             return list(self._channels.keys())
@@ -1546,6 +1567,104 @@ class WriteTask:
         return cls(**d)
 
 
+# ================================================================
+#  计算任务 — 根据公式实时计算通道值
+# ================================================================
+class CalcTask:
+    """计算任务 — 基于公式引用其他通道的实时值进行计算
+
+    公式中可使用的变量引用方式:
+      - task_id:  如 task_out2_ch8  (引用该任务的第一个通道值)
+      - channel_prefix: 如 out2_ch8  (引用该前缀下第一个通道值)
+      - channel_id: 如 out2_ch8_4223 (直接引用完整通道ID)
+
+    支持的运算符: +  -  *  /  %  **  ()
+    支持的函数: abs, min, max, sqrt, sin, cos, tan, log, exp
+    """
+
+    import re as _re
+    _FUNC_MAP = {
+        "abs": abs, "min": min, "max": max,
+        "sqrt": __import__("math").sqrt,
+        "sin": __import__("math").sin,
+        "cos": __import__("math").cos,
+        "tan": __import__("math").tan,
+        "log": __import__("math").log,
+        "exp": __import__("math").exp,
+        "pow": pow,
+    }
+
+    def __init__(self, task_id: str, channel_prefix: str,
+                 channel_name: str, formula: str,
+                 unit: str = "", scale: float = 1.0,
+                 offset: float = 0.0):
+        self.task_id = task_id
+        self.channel_prefix = channel_prefix
+        self.channel_name = channel_name
+        self.formula = formula
+        self.unit = unit
+        self.scale = scale
+        self.offset = offset
+
+    def get_channel_id(self):
+        """计算通道ID (使用 channel_prefix 作为唯一标识)"""
+        return self.channel_prefix
+
+    def get_channel_ids(self):
+        return [self.channel_prefix]
+
+    def get_channel_names(self):
+        return [self.channel_name]
+
+    def to_dict(self):
+        return {
+            "task_id": self.task_id,
+            "channel_prefix": self.channel_prefix,
+            "channel_name": self.channel_name,
+            "formula": self.formula,
+            "unit": self.unit,
+            "scale": self.scale,
+            "offset": self.offset,
+        }
+
+    @classmethod
+    def from_dict(cls, d):
+        return cls(**d)
+
+    @classmethod
+    def extract_variables(cls, formula: str) -> list:
+        """从公式中提取所有变量名 (标识符)"""
+        return cls._re.findall(r'[a-zA-Z_][a-zA-Z0-9_]*', formula)
+
+    @classmethod
+    def evaluate(cls, formula: str, variable_values: dict) -> float:
+        """使用给定变量值计算公式
+
+        Args:
+            formula: 公式字符串, 如 "(a-b)/2"
+            variable_values: {变量名: 数值} 字典
+
+        Returns:
+            计算结果 (float)
+
+        Raises:
+            ValueError: 公式中包含未定义变量
+        """
+        # 合并内置函数
+        namespace = {**cls._FUNC_MAP, **variable_values}
+        # 检查未定义的变量
+        found_vars = cls.extract_variables(formula)
+        builtin_names = set(cls._FUNC_MAP.keys())
+        for v in found_vars:
+            if v not in variable_values and v not in builtin_names:
+                raise ValueError(f"公式中包含未定义变量: '{v}'")
+        try:
+            result = eval(formula, {"__builtins__": {}}, namespace)
+            return float(result)
+        except Exception as e:
+            raise ValueError(f"公式计算错误: {e}") from e
+
+
 class AcquisitionWorker(QObject):
     """后台采集线程 — 逐任务轮询所有连接"""
     data_acquired = Signal(str, float, float)
@@ -1559,12 +1678,15 @@ class AcquisitionWorker(QObject):
         self._connections = {}
         self._tasks = []
         self._write_tasks = []  # WriteTask 列表
+        self._calc_tasks = []   # CalcTask 列表
         self._running = False
         self._poll_interval = 0.5
         self._thread = None
         self._write_thread = None
         # 记录每个写入任务下一次应触发的时间戳
         self._write_next_time: dict = {}
+        # task_id → PollingTask 映射 (用于公式变量解析)
+        self._task_id_to_task: dict = {}
 
     def add_connection(self, conn_id: str, conn_type: str, **kwargs):
         if conn_type == "modbus_tcp":
@@ -1581,6 +1703,7 @@ class AcquisitionWorker(QObject):
 
     def add_task(self, task: PollingTask):
         self._tasks.append(task)
+        self._task_id_to_task[task.task_id] = task
         ch_ids = task.get_channel_ids()
         ch_names = task.get_channel_names()
         for cid, cname in zip(ch_ids, ch_names):
@@ -1588,6 +1711,19 @@ class AcquisitionWorker(QObject):
                 cid, cname, task.unit, task.connection_id,
                 task.scale, task.offset, task.data_type
             )
+
+    def add_calc_task(self, task: CalcTask):
+        self._calc_tasks.append(task)
+        ch_ids = task.get_channel_ids()
+        ch_names = task.get_channel_names()
+        for cid, cname in zip(ch_ids, ch_names):
+            self.store.register_channel(
+                cid, cname, task.unit, "",
+                task.scale, task.offset, "float64"
+            )
+
+    def remove_calc_task(self, task_id: str):
+        self._calc_tasks = [t for t in self._calc_tasks if t.task_id != task_id]
 
     def add_write_task(self, task: WriteTask):
         self._write_tasks.append(task)
@@ -1598,8 +1734,10 @@ class AcquisitionWorker(QObject):
 
     def clear_all(self):
         self._tasks.clear()
+        self._calc_tasks.clear()
         self._write_tasks.clear()
         self._write_next_time.clear()
+        self._task_id_to_task.clear()
         for conn in self._connections.values():
             conn["connector"].disconnect()
         self._connections.clear()
@@ -1667,6 +1805,10 @@ class AcquisitionWorker(QObject):
                                    source=f"采集异常[{task.connection_id}]")
                     self.error_occurred.emit(task.connection_id, str(e))
 
+            # ---- 计算任务评估 ----
+            if self._calc_tasks:
+                self._evaluate_calc_tasks()
+
             time.sleep(self._poll_interval)
 
         # 清理
@@ -1709,6 +1851,65 @@ class AcquisitionWorker(QObject):
                 print(f"[ByteOrderDecoder] 解码失败: {e}")
                 return None
         return None
+
+    # ---- 计算任务评估 ----
+    def _evaluate_calc_tasks(self):
+        """评估所有计算任务, 将结果存入 DataStore 并发出信号.
+        执行两轮以支持计算任务之间的相互依赖."""
+        if not self._calc_tasks:
+            return
+        for _pass in range(2):
+            for calc_task in self._calc_tasks:
+                try:
+                    ts = time.time()
+                    formula = calc_task.formula
+
+                    # 1. 提取公式中的变量名
+                    var_names = CalcTask.extract_variables(formula)
+
+                    # 2. 解析每个变量为实际通道值
+                    variable_values = {}
+                    for var_name in var_names:
+                        if var_name in CalcTask._FUNC_MAP:
+                            continue
+                        # 策略1: 直接匹配 task_id
+                        polling_task = self._task_id_to_task.get(var_name)
+                        if polling_task:
+                            ch_ids = polling_task.get_channel_ids()
+                            if ch_ids:
+                                val = self.store.get_latest_value(ch_ids[0])
+                                if val is not None:
+                                    variable_values[var_name] = val
+                                    continue
+                        # 策略2: 匹配 channel_prefix (查找以此前缀开头的通道)
+                        channel_id = self.store.find_channel_by_prefix(var_name)
+                        if channel_id:
+                            val = self.store.get_latest_value(channel_id)
+                            if val is not None:
+                                variable_values[var_name] = val
+                                continue
+                        # 策略3: 匹配完整 channel_id
+                        val = self.store.get_latest_value(var_name)
+                        if val is not None:
+                            variable_values[var_name] = val
+                            continue
+                        # 找不到则跳过此变量 (保持为0)
+                        variable_values[var_name] = 0.0
+
+                    # 3. 计算公式值
+                    result = CalcTask.evaluate(formula, variable_values)
+
+                    # 4. 存入 DataStore (使用 calc task 的 channel_prefix 作为通道ID)
+                    ch_id = calc_task.channel_prefix
+                    self.store.add_data(ch_id, ts, result)
+
+                    # 仅在最后一轮发送信号
+                    if _pass == 1:
+                        self.data_acquired.emit(ch_id, ts, result)
+
+                except Exception as e:
+                    err_msg = f"计算任务[{calc_task.task_id}]错误: {e}"
+                    self.error_occurred.emit(calc_task.task_id, err_msg)
 
     # ---- 写入循环 ----
     def _run_write_loop(self):
@@ -2263,6 +2464,149 @@ class WriteTaskConfigDialog(QWidget):
 
 
 # ================================================================
+#  计算任务配置对话框
+# ================================================================
+class CalcTaskConfigDialog(QWidget):
+    """计算任务配置对话框 — 通过公式计算通道值"""
+    calc_task_added = Signal(dict)
+
+    def __init__(self, connections: dict, tasks: list):
+        super().__init__()
+        self._connections = connections
+        self._tasks = tasks  # PollingTask 列表, 用于提示可用变量
+        self.setWindowTitle("添加计算任务")
+        self.setWindowModality(Qt.ApplicationModal)
+        self.setMinimumWidth(480)
+        self._build_ui()
+
+    def _build_ui(self):
+        layout = QGridLayout(self)
+
+        layout.addWidget(QLabel("通道ID(前缀):"), 0, 0)
+        self.edit_prefix = QLineEdit("calc_ch1")
+        layout.addWidget(self.edit_prefix, 0, 1)
+
+        layout.addWidget(QLabel("通道名称:"), 1, 0)
+        self.edit_name = QLineEdit("计算通道1")
+        layout.addWidget(self.edit_name, 1, 1)
+
+        layout.addWidget(QLabel("公式:"), 2, 0)
+        self.edit_formula = QLineEdit("(task_out2_ch8 - task_out2_ch7) / 2")
+        self.edit_formula.setPlaceholderText(
+            "支持 + - * / % () 及 abs, min, max, sqrt, sin, cos, tan, log, exp, pow"
+        )
+        layout.addWidget(self.edit_formula, 2, 1)
+
+        layout.addWidget(QLabel("单位:"), 3, 0)
+        self.edit_unit = QLineEdit("")
+        layout.addWidget(self.edit_unit, 3, 1)
+
+        layout.addWidget(QLabel("缩放系数:"), 4, 0)
+        self.spin_scale = QDoubleSpinBox()
+        self.spin_scale.setRange(-999999, 999999)
+        self.spin_scale.setDecimals(6)
+        self.spin_scale.setValue(1.0)
+        layout.addWidget(self.spin_scale, 4, 1)
+
+        layout.addWidget(QLabel("偏移量:"), 5, 0)
+        self.spin_offset = QDoubleSpinBox()
+        self.spin_offset.setRange(-999999, 999999)
+        self.spin_offset.setDecimals(6)
+        layout.addWidget(self.spin_offset, 5, 1)
+
+        # 可用变量提示
+        var_hint_text = self._build_variable_hint()
+        lbl_hint = QLabel(var_hint_text)
+        lbl_hint.setStyleSheet("color: #6c7086; font-size: 11px;")
+        lbl_hint.setWordWrap(True)
+        layout.addWidget(lbl_hint, 6, 0, 1, 2)
+
+        # 测试按钮
+        self.btn_test = QPushButton("测试公式")
+        self.btn_test.clicked.connect(self._on_test_formula)
+        layout.addWidget(self.btn_test, 7, 0)
+
+        btn_layout = QHBoxLayout()
+        btn_ok = QPushButton("确定")
+        btn_cancel = QPushButton("取消")
+        btn_ok.clicked.connect(self._on_ok)
+        btn_cancel.clicked.connect(self.close)
+        btn_layout.addWidget(btn_ok)
+        btn_layout.addWidget(btn_cancel)
+        layout.addLayout(btn_layout, 7, 1)
+
+    def _build_variable_hint(self) -> str:
+        """构建可用变量提示文本"""
+        lines = ["📋 可用变量 (task_id / channel_prefix):"]
+        if not self._tasks:
+            lines.append("  (暂无采集任务, 请先添加采集任务)")
+        else:
+            for t in self._tasks[:20]:  # 最多显示20个
+                ch_ids = t.get_channel_ids()
+                prefix_info = f", 前缀: {t.channel_prefix}" if t.channel_prefix else ""
+                lines.append(
+                    f"  • {t.task_id} → {ch_ids[0] if ch_ids else '?'} "
+                    f"({t.channel_name}{prefix_info})"
+                )
+            if len(self._tasks) > 20:
+                lines.append(f"  ... 共 {len(self._tasks)} 个任务")
+        return "\n".join(lines)
+
+    @_safe_event
+    def _on_test_formula(self):
+        """测试公式 (仅做语法检查, 不实际连接设备)"""
+        formula = self.edit_formula.text().strip()
+        if not formula:
+            QMessageBox.warning(self, "警告", "请输入公式")
+            return
+        try:
+            # 尝试用虚拟变量 (值为1) 来测试公式语法
+            var_names = CalcTask.extract_variables(formula)
+            test_vars = {v: 1.0 for v in var_names
+                        if v not in CalcTask._FUNC_MAP}
+            result = CalcTask.evaluate(formula, test_vars)
+            QMessageBox.information(self, "测试通过",
+                                    f"公式语法正确!\n测试结果 (变量=1时): {result}")
+        except ValueError as e:
+            QMessageBox.warning(self, "公式错误", str(e))
+        except Exception as e:
+            QMessageBox.warning(self, "公式错误", f"公式解析失败: {e}")
+
+    @_safe_event
+    def _on_ok(self):
+        prefix = self.edit_prefix.text().strip()
+        name = self.edit_name.text().strip()
+        formula = self.edit_formula.text().strip()
+        if not prefix or not name:
+            QMessageBox.warning(self, "警告", "请填写通道ID和名称")
+            return
+        if not formula:
+            QMessageBox.warning(self, "警告", "请输入计算公式")
+            return
+        # 验证公式
+        try:
+            var_names = CalcTask.extract_variables(formula)
+            test_vars = {v: 1.0 for v in var_names
+                        if v not in CalcTask._FUNC_MAP}
+            CalcTask.evaluate(formula, test_vars)
+        except ValueError as e:
+            QMessageBox.warning(self, "公式错误", str(e))
+            return
+
+        task_dict = {
+            "task_id": f"calc_{int(time.time()*1000)}",
+            "channel_prefix": prefix,
+            "channel_name": name,
+            "formula": formula,
+            "unit": self.edit_unit.text().strip(),
+            "scale": self.spin_scale.value(),
+            "offset": self.spin_offset.value(),
+        }
+        self.calc_task_added.emit(task_dict)
+        self.close()
+
+
+# ================================================================
 #  第八部分: 主窗口
 # ================================================================
 class MainWindow(QMainWindow):
@@ -2278,6 +2622,7 @@ class MainWindow(QMainWindow):
         self._connections = {}
         self._tasks = []
         self._write_tasks = []  # WriteTask 列表
+        self._calc_tasks = []   # CalcTask 列表
         self._chart_widgets = {}
         self._channel_to_chart = {}
 
@@ -2300,7 +2645,7 @@ class MainWindow(QMainWindow):
         self._load_config()
 
         # 软件启动时自动开始采集（如果已配置采集任务或写入任务）
-        if self._tasks or self._write_tasks:
+        if self._tasks or self._write_tasks or self._calc_tasks:
             self._on_start()
             self.status_bar.showMessage("已自动开始采集", 3000)
 
@@ -2313,6 +2658,7 @@ class MainWindow(QMainWindow):
         toolbar = QHBoxLayout()
         self.btn_add_conn = QPushButton("➕ 添加连接")
         self.btn_add_task = QPushButton("➕ 添加采集任务")
+        self.btn_add_calc_task = QPushButton("ƒ 添加计算任务")
         self.btn_add_write_task = QPushButton("✏ 添加写入任务")
         self.btn_del_write_task = QPushButton("🗑 删除写入任务")
         self.btn_start = QPushButton("▶ 开始采集")
@@ -2328,6 +2674,7 @@ class MainWindow(QMainWindow):
 
         toolbar.addWidget(self.btn_add_conn)
         toolbar.addWidget(self.btn_add_task)
+        toolbar.addWidget(self.btn_add_calc_task)
         toolbar.addWidget(self.btn_add_write_task)
         toolbar.addWidget(self.btn_del_write_task)
         toolbar.addSpacing(20)
@@ -2394,6 +2741,25 @@ class MainWindow(QMainWindow):
         write_group.setLayout(write_layout)
         left_layout.addWidget(write_group)
 
+        # 计算任务表格
+        calc_group = QGroupBox("已配置计算任务")
+        calc_layout = QVBoxLayout()
+        calc_btn_layout = QHBoxLayout()
+        self.btn_del_calc_task = QPushButton("🗑 删除计算任务")
+        calc_btn_layout.addWidget(self.btn_del_calc_task)
+        calc_btn_layout.addStretch()
+        calc_layout.addLayout(calc_btn_layout)
+        self.table_calc = QTableWidget(0, 5)
+        self.table_calc.setHorizontalHeaderLabels(
+            ["通道ID", "通道名称", "公式", "单位", "缩放系数"])
+        self.table_calc.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table_calc.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table_calc.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table_calc.setSelectionMode(QTableWidget.SingleSelection)
+        calc_layout.addWidget(self.table_calc)
+        calc_group.setLayout(calc_layout)
+        left_layout.addWidget(calc_group)
+
         splitter.addWidget(left_panel)
 
         # 右: 图表
@@ -2434,8 +2800,10 @@ class MainWindow(QMainWindow):
     def _connect_signals(self):
         self.btn_add_conn.clicked.connect(self._on_add_connection)
         self.btn_add_task.clicked.connect(self._on_add_task)
+        self.btn_add_calc_task.clicked.connect(self._on_add_calc_task)
         self.btn_add_write_task.clicked.connect(self._on_add_write_task)
         self.btn_del_write_task.clicked.connect(self._on_del_write_task)
+        self.btn_del_calc_task.clicked.connect(self._on_del_calc_task)
         self.btn_start.clicked.connect(self._on_start)
         self.btn_stop.clicked.connect(self._on_stop)
         self.btn_export.clicked.connect(self._on_export)
@@ -2563,6 +2931,72 @@ class MainWindow(QMainWindow):
         self._refresh_task_table()
         self._ensure_chart_for_task(task)
         self.status_bar.showMessage(f"已添加采集任务: {task.channel_name}", 3000)
+
+    # ---- 计算任务管理 ----
+    @_safe_event
+    def _on_add_calc_task(self):
+        if not self._tasks:
+            QMessageBox.warning(self, "提示", "请先添加至少一个采集任务 (计算任务需要引用采集任务的数据)")
+            return
+        self._calc_task_dialog = CalcTaskConfigDialog(self._connections, self._tasks)
+        self._calc_task_dialog.calc_task_added.connect(self._add_calc_task)
+        self._calc_task_dialog.show()
+
+    @_safe_event
+    def _add_calc_task(self, task_dict):
+        task = CalcTask.from_dict(task_dict)
+        self._calc_tasks.append(task)
+        self.worker.add_calc_task(task)
+        self._refresh_calc_table()
+        self._ensure_chart_for_calc_task(task)
+        self.status_bar.showMessage(f"已添加计算任务: {task.channel_name}", 3000)
+
+    @_safe_event
+    def _on_del_calc_task(self):
+        row = self.table_calc.currentRow()
+        if row < 0 or row >= len(self._calc_tasks):
+            QMessageBox.warning(self, "提示", "请先在计算任务表中选择要删除的任务")
+            return
+        task = self._calc_tasks.pop(row)
+        self.worker.remove_calc_task(task.task_id)
+        self._refresh_calc_table()
+        # 删除对应图表
+        chart_id = task.channel_prefix
+        if chart_id in self._chart_widgets:
+            chart = self._chart_widgets.pop(chart_id)
+            chart.deleteLater()
+        # 清理 channel_to_chart 映射
+        self._channel_to_chart = {
+            k: v for k, v in self._channel_to_chart.items()
+            if v != chart_id
+        }
+        self.status_bar.showMessage(f"已删除计算任务: {task.channel_name}", 3000)
+
+    @_safe_event
+    def _refresh_calc_table(self):
+        self.table_calc.blockSignals(True)
+        self.table_calc.setRowCount(len(self._calc_tasks))
+        for i, task in enumerate(self._calc_tasks):
+            self.table_calc.setItem(i, 0, QTableWidgetItem(task.channel_prefix))
+            self.table_calc.setItem(i, 1, QTableWidgetItem(task.channel_name))
+            self.table_calc.setItem(i, 2, QTableWidgetItem(task.formula))
+            self.table_calc.setItem(i, 3, QTableWidgetItem(task.unit))
+            self.table_calc.setItem(i, 4, QTableWidgetItem(str(task.scale)))
+        self.table_calc.blockSignals(False)
+
+    @_safe_event
+    def _ensure_chart_for_calc_task(self, task: CalcTask):
+        self._placeholder_label.setVisible(False)
+        chart_id = task.channel_prefix
+        if chart_id not in self._chart_widgets:
+            chart = ChartWidget(title=task.channel_name)
+            self.chart_container.addWidget(chart)
+            self._chart_widgets[chart_id] = chart
+        chart = self._chart_widgets[chart_id]
+        for cid, cname in zip(task.get_channel_ids(), task.get_channel_names()):
+            if cid not in self._channel_to_chart:
+                chart.add_channel(cid, cname)
+                self._channel_to_chart[cid] = chart_id
 
     # ---- 写入任务管理 ----
     @_safe_event
@@ -2746,8 +3180,8 @@ class MainWindow(QMainWindow):
     # ---- 采集控制 ----
     @_safe_event
     def _on_start(self):
-        if not self._tasks and not self._write_tasks:
-            QMessageBox.warning(self, "提示", "请先添加至少一个采集任务或写入任务")
+        if not self._tasks and not self._write_tasks and not self._calc_tasks:
+            QMessageBox.warning(self, "提示", "请先添加至少一个采集任务、写入任务或计算任务")
             return
         self.worker.set_poll_interval(self.spin_interval.value())
         self.worker.start()
@@ -2755,8 +3189,10 @@ class MainWindow(QMainWindow):
         self.btn_stop.setEnabled(True)
         self.btn_add_conn.setEnabled(False)
         self.btn_add_task.setEnabled(False)
+        self.btn_add_calc_task.setEnabled(False)
         self.btn_add_write_task.setEnabled(False)
         self.btn_del_write_task.setEnabled(False)
+        self.btn_del_calc_task.setEnabled(False)
         self.status_bar.showMessage("采集已启动", 3000)
 
     @_safe_event
@@ -2766,8 +3202,10 @@ class MainWindow(QMainWindow):
         self.btn_stop.setEnabled(False)
         self.btn_add_conn.setEnabled(True)
         self.btn_add_task.setEnabled(True)
+        self.btn_add_calc_task.setEnabled(True)
         self.btn_add_write_task.setEnabled(True)
         self.btn_del_write_task.setEnabled(True)
+        self.btn_del_calc_task.setEnabled(True)
         self.status_bar.showMessage("采集已停止", 3000)
 
     # ---- 事件回调 ----
@@ -2885,6 +3323,7 @@ class MainWindow(QMainWindow):
                 for cid, info in self._connections.items()
             },
             "tasks": [t.to_dict() for t in self._tasks],
+            "calc_tasks": [t.to_dict() for t in self._calc_tasks],
             "write_tasks": [t.to_dict() for t in self._write_tasks],
             "poll_interval": self.spin_interval.value(),
         }
@@ -2915,6 +3354,7 @@ class MainWindow(QMainWindow):
         self.worker.clear_all()
         self._connections.clear()
         self._tasks.clear()
+        self._calc_tasks.clear()
         self._write_tasks.clear()
         for chart in self._chart_widgets.values():
             chart.deleteLater()
@@ -2925,12 +3365,15 @@ class MainWindow(QMainWindow):
             self._add_connection(cid, info["type"], info["params"])
         for td in config.get("tasks", []):
             self._add_task(td)
+        for td in config.get("calc_tasks", []):
+            self._add_calc_task(td)
         for td in config.get("write_tasks", []):
             self._add_write_task(td)
         self.spin_interval.setValue(config.get("poll_interval", 0.5))
 
         self._refresh_conn_table()
         self._refresh_task_table()
+        self._refresh_calc_table()
         self._refresh_write_table()
         self.status_bar.showMessage("配置已加载", 3000)
 
