@@ -1,11 +1,4 @@
 calc_tasks:
-- channel_name: 上层实时CH3
-  channel_prefix: calc_live_ch3
-  formula: task_sv_ch3*10+(170-task_temp_ch4)*5
-  offset: 0.0
-  scale: 1.0
-  task_id: calc_1785919067203
-  unit: ℃
 - channel_name: 下层实时CH1
   channel_prefix: calc_live_ch1
   formula: task_sv_ch1*10+(170-task_temp_ch1)*5
@@ -13,19 +6,26 @@ calc_tasks:
   scale: 1.0
   task_id: calc_1785919067200
   unit: ℃
-- channel_name: 上层实时CH4
-  channel_prefix: calc_live_ch4
-  formula: task_sv_ch4*10+(task_temp_ch4-task_temp_ch6)*5
-  offset: 0.0
-  scale: 1.0
-  task_id: calc_live_ch4_1785919067204
-  unit: ℃
 - channel_name: 下层实时CH2
   channel_prefix: calc_live_ch2
   formula: task_sv_ch2*10+(task_temp_ch1-task_temp_ch3)*5
   offset: 0.0
   scale: 1.0
   task_id: calc_live_ch2_1785919067201
+  unit: ℃
+- channel_name: 上层实时CH3
+  channel_prefix: calc_live_ch3
+  formula: task_sv_ch3*10+(170-task_temp_ch4)*5
+  offset: 0.0
+  scale: 1.0
+  task_id: calc_1785919067203
+  unit: ℃
+- channel_name: 上层实时CH4
+  channel_prefix: calc_live_ch4
+  formula: task_sv_ch4*10+(task_temp_ch4-task_temp_ch6)*5
+  offset: 0.0
+  scale: 1.0
+  task_id: calc_live_ch4_1785919067204
   unit: ℃
 - channel_name: 上层实时CH3与设定温度差
   channel_prefix: calc_live_ch3_diff
@@ -279,6 +279,32 @@ tasks:
   task_id: task_sv_ch2
   unit: °C
 - byte_order: abcd
+  channel_name: CH3设定温度
+  channel_prefix: sv_ch3
+  connection_id: dte_rtu_com9
+  connection_type: modbus_rtu
+  data_type: uint16
+  device_type: holding
+  offset: 0
+  quantity: 1
+  scale: 0.1
+  start_addr: 4106
+  task_id: task_sv_ch3
+  unit: °C
+- byte_order: abcd
+  channel_name: CH4设定温度
+  channel_prefix: sv_ch4
+  connection_id: dte_rtu_com9
+  connection_type: modbus_rtu
+  data_type: uint16
+  device_type: holding
+  offset: 0
+  quantity: 1
+  scale: 0.1
+  start_addr: 4107
+  task_id: task_sv_ch4
+  unit: °C
+- byte_order: abcd
   channel_name: 下层中间两个加热棒占空比DM15100
   channel_prefix: lower_mid_heater
   connection_id: pwm_plc1
@@ -434,32 +460,6 @@ tasks:
   start_addr: 4215
   task_id: task_out1_ch8
   unit: '%'
-- byte_order: abcd
-  channel_name: CH3设定温度
-  channel_prefix: sv_ch3
-  connection_id: dte_rtu_com9
-  connection_type: modbus_rtu
-  data_type: uint16
-  device_type: holding
-  offset: 0
-  quantity: 1
-  scale: 0.1
-  start_addr: 4106
-  task_id: task_sv_ch3
-  unit: °C
-- byte_order: abcd
-  channel_name: CH4设定温度
-  channel_prefix: sv_ch4
-  connection_id: dte_rtu_com9
-  connection_type: modbus_rtu
-  data_type: uint16
-  device_type: holding
-  offset: 0
-  quantity: 1
-  scale: 0.1
-  start_addr: 4107
-  task_id: task_sv_ch4
-  unit: °C
 write_tasks:
 - byte_order: abcd
   connection_id: pt100_rtu_com11
