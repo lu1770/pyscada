@@ -29,7 +29,7 @@ calc_tasks:
   unit: ℃
 - channel_name: 上层实时CH3与设定温度差
   channel_prefix: calc_live_ch3_diff
-  formula: task_sv_ch3+(-task_temp_ch3)
+  formula: task_sv_ch3+(-task_temp_ch4)
   offset: 0.0
   scale: 1.0
   task_id: calc_1785919067205
