@@ -10,7 +10,7 @@ CSV Pivot Table + Linear Interpolation + High-Resolution Line Charts
 - 对结果做线性插值，填充所有 NaN / 空白单元格
 - 为每个 channel_name 生成高分辨率折线图
 
-C:/Users/zheng/AppData/Local/Python/pythoncore-3.14-64/python.exe c:/code/pyscada/pivot.py C:\Users\zheng\Downloads\下模上下层基本稳定daq_export_20260807_075837.csv --chart-dir=下模上下层基本稳定
+C:/Users/zheng/AppData/Local/Python/pythoncore-3.14-64/python.exe c:/code/pyscada/pivot.py C:/Users/zheng/Downloads/下模上下层基本稳定daq_export_20260807_075837.csv --chart-dir=下模上下层基本稳定
 
 
 """
