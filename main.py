@@ -2140,8 +2140,10 @@ class ChartWidget(pg.PlotWidget):
         self.setMinimumHeight(200)
         self.setBackground("#eff1f5")
         self.setTitle(title, color="#4c4f69", size="10pt")
-        self.setLabel("left", color="#4c4f69")
+        self.setLabel("right", color="#4c4f69")
         self.setLabel("bottom", "时间(s)", color="#4c4f69")
+        self.showAxis("right")
+        self.hideAxis("left")
         self.showGrid(x=True, y=True, alpha=0.3)
         self._curves = {}
         self._colors = [

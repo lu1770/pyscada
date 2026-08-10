@@ -1,3 +1,7 @@
+# Frozen dependency versions for reproducible installs.
+# Generated via `pip freeze` from .venv on 2026-08-10.
+# Curated runtime deps remain in requirements.txt (used by build.py).
+
 asttokens==3.0.2
 colorama==0.4.6
 comm==0.2.3
