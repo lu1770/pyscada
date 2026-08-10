@@ -131,6 +131,46 @@ calc_write_tasks:
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
+  name: 设置CH1设定温度SV
+  source_task_id: calc_1785919067200
+  start_addr: 4104
+  task_id: calcwrite_1785919993452
+  write_interval: 1000.0
+- byte_order: abcd
+  connection_id: dte_rtu_com9
+  connection_type: modbus_rtu
+  data_type: uint16
+  device_type: holding
+  name: 设置CH2设定温度SV
+  source_task_id: calc_live_ch2_1785919067201
+  start_addr: 4105
+  task_id: calc_write_sv_ch2_1785919993453
+  write_interval: 1000.0
+- byte_order: abcd
+  connection_id: dte_rtu_com9
+  connection_type: modbus_rtu
+  data_type: uint16
+  device_type: holding
+  name: 设置CH4设定温度SV
+  source_task_id: calc_live_ch4_1785919067204
+  start_addr: 4107
+  task_id: calc_write_sv_ch4_1785919993455
+  write_interval: 1000.0
+- byte_order: abcd
+  connection_id: dte_rtu_com9
+  connection_type: modbus_rtu
+  data_type: uint16
+  device_type: holding
+  name: 设置CH3设定温度SV
+  source_task_id: calc_1785919067203
+  start_addr: 4106
+  task_id: calc_write_sv_ch3_1785919993454
+  write_interval: 1000.0
+- byte_order: abcd
+  connection_id: dte_rtu_com9
+  connection_type: modbus_rtu
+  data_type: uint16
+  device_type: holding
   name: 写入CH1输出功率(4208)
   source_task_id: calc_power_ch1
   start_addr: 4208
