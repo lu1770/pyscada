@@ -1,42 +1,42 @@
 calc_tasks:
-- channel_name: 下层实时CH1
+- channel_name: 下层SV实时CH1
   channel_prefix: calc_live_ch1
-  formula: task_sv_ch1*10+(170-task_temp_ch1)*5
+  formula: min(max(task_sv_ch1*10+(180-task_temp_ch1)*10,1500),2500)
   offset: 0.0
   scale: 1.0
   task_id: calc_1785919067200
   unit: ℃
-- channel_name: 下层实时CH2
+- channel_name: 下层SV实时CH2
   channel_prefix: calc_live_ch2
-  formula: task_sv_ch2*10+(task_temp_ch1-task_temp_ch3)*5
+  formula: min(max(task_sv_ch2*10+(task_temp_ch1-task_temp_ch3)*10,1500),2500)
   offset: 0.0
   scale: 1.0
   task_id: calc_live_ch2_1785919067201
   unit: ℃
-- channel_name: 上层实时CH3
+- channel_name: 上层SV实时CH3
   channel_prefix: calc_live_ch3
-  formula: task_sv_ch3*10+(170-task_temp_ch4)*5
+  formula: min(max(task_sv_ch3*10+(180-task_temp_ch4)*10,1500),2500)
   offset: 0.0
   scale: 1.0
   task_id: calc_1785919067203
   unit: ℃
-- channel_name: 上层实时CH4
+- channel_name: 上层SV实时CH4
   channel_prefix: calc_live_ch4
-  formula: task_sv_ch4*10+(task_temp_ch4-task_temp_ch6)*5
+  formula: min(max(task_sv_ch4*10+(task_temp_ch4-task_temp_ch6)*10,1500),2500)
   offset: 0.0
   scale: 1.0
   task_id: calc_live_ch4_1785919067204
   unit: ℃
-- channel_name: 上层实时CH3与设定温度差
+- channel_name: 上层SV实时CH3与设定温度差
   channel_prefix: calc_live_ch3_diff
-  formula: task_sv_ch3+(-task_temp_ch4)
+  formula: task_sv_ch3-task_temp_ch4
   offset: 0.0
   scale: 1.0
   task_id: calc_1785919067205
   unit: ℃
-- channel_name: 下层实时CH1与设定温度差
+- channel_name: 下层SV实时CH1与设定温度差
   channel_prefix: calc_live_ch1_diff
-  formula: task_sv_ch1+(-task_temp_ch1)
+  formula: task_sv_ch1-task_temp_ch1
   offset: 0.0
   scale: 1.0
   task_id: calc_1785919067204
@@ -71,14 +71,14 @@ calc_tasks:
   unit: ℃
 - channel_name: 下层PWM调节值
   channel_prefix: calc_lower_pwm
-  formula: heater_duty_lower_mid-(task_temp_ch2*2-task_temp_ch1-task_temp_ch3)*0.5
+  formula: heater_duty_lower_mid-(task_temp_ch2*2-task_temp_ch1-task_temp_ch3)*0.5-task_temp_ch1-task_temp_ch3
   offset: 0.0
   scale: 1.0
   task_id: calc_pwm_1785919067209
   unit: '%'
 - channel_name: 中层下面PWM调节值
   channel_prefix: calc_mid_lower_pwm
-  formula: heater_duty_mid_lower_mid-(task_temp_ch5*2-task_temp_ch4-task_temp_ch6)*0.5  
+  formula: heater_duty_mid_lower_mid-(task_temp_ch5*2-task_temp_ch4-task_temp_ch6)*0.5-task_temp_ch4-task_temp_ch6
   offset: 0.0
   scale: 1.0
   task_id: calc_pwm_1785919067210
@@ -93,7 +93,7 @@ calc_write_tasks:
   source_task_id: calc_1785919067200
   start_addr: 4104
   task_id: calcwrite_1785919993452
-  write_interval: 2000.0
+  write_interval: 1000.0
 - byte_order: abcd
   name: 下层PWM调节值
   connection_id: pwm_plc1
@@ -123,7 +123,7 @@ calc_write_tasks:
   source_task_id: calc_live_ch2_1785919067201
   start_addr: 4105
   task_id: calc_write_sv_ch2_1785919993453
-  write_interval: 2000.0
+  write_interval: 1000.0
 - byte_order: abcd
   connection_id: dte_rtu_com9
   connection_type: modbus_rtu
@@ -131,9 +131,9 @@ calc_write_tasks:
   device_type: holding
   name: 设置CH4设定温度SV
   source_task_id: calc_live_ch4_1785919067204
-  start_addr: 4106
+  start_addr: 4107
   task_id: calc_write_sv_ch4_1785919993455
-  write_interval: 2000.0
+  write_interval: 1000.0
 - byte_order: abcd
   connection_id: dte_rtu_com9
   connection_type: modbus_rtu
@@ -143,7 +143,7 @@ calc_write_tasks:
   source_task_id: calc_1785919067203
   start_addr: 4106
   task_id: calc_write_sv_ch3_1785919993454
-  write_interval: 2000.0
+  write_interval: 1000.0
 connections:
   dte_rtu_com9:
     params:
@@ -172,7 +172,7 @@ connections:
       timeout: 3.0
       unit: 0
     type: keyence
-poll_interval: 60.0
+poll_interval: 15.0
 tasks:
 - byte_order: abcd
   channel_name: 第1路温度

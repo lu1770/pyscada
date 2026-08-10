@@ -387,35 +387,39 @@ class ModbusTCPConnector:
         self.timeout = timeout
         self._sock: Optional[socket.socket] = None
         self._txn_id = 0
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()  # 可重入：允许 connect()→disconnect()、_send_request异常→disconnect() 同线程嵌套
 
     def connect(self) -> bool:
-        try:
-            self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self._sock.settimeout(self.timeout)
-            self._sock.connect((self.host, self.port))
-            return True
-        except Exception as e:
-            print(f"[Modbus] 连接失败 {self.host}:{self.port} -> {e}")
-            self._sock = None
-            return False
+        with self._lock:
+            # 释放可能残留的旧句柄，避免重连时旧 socket 泄漏/冲突
+            self.disconnect()
+            try:
+                self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self._sock.settimeout(self.timeout)
+                self._sock.connect((self.host, self.port))
+                return True
+            except Exception as e:
+                print(f"[Modbus] 连接失败 {self.host}:{self.port} -> {e}")
+                self._sock = None
+                return False
 
     def disconnect(self):
-        if self._sock:
-            try:
-                self._sock.close()
-            except Exception:
-                pass
-            self._sock = None
+        with self._lock:
+            if self._sock:
+                try:
+                    self._sock.close()
+                except Exception:
+                    pass
+                self._sock = None
 
     def is_connected(self) -> bool:
         return self._sock is not None
 
     def _send_request(self, func_code: int, start_addr: int,
                       quantity: int) -> Optional[bytes]:
-        if not self._sock:
-            return None
         with self._lock:
+            if not self._sock:
+                return None
             self._txn_id = (self._txn_id + 1) & 0xFFFF
             length = 6
             mbap = struct.pack(">HHH", self._txn_id, 0, length)
@@ -530,9 +534,9 @@ class ModbusTCPConnector:
     # ---- 写入接口 ----
     def _send_write_request(self, func_code: int, pdu_body: bytes) -> bool:
         """发送写请求并验证响应。返回 True 表示写入成功。"""
-        if not self._sock:
-            return False
         with self._lock:
+            if not self._sock:
+                return False
             self._txn_id = (self._txn_id + 1) & 0xFFFF
             length = 2 + len(pdu_body)  # unit_id(1) + pdu
             mbap = struct.pack(">HHH", self._txn_id, 0, length)
@@ -655,7 +659,7 @@ class ModbusRTUConnector:
         self.stopbits = stopbits
         self.bytesize = bytesize
         self._ser = None
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()  # 可重入：允许 connect()→disconnect()、_send_request异常→disconnect() 同线程嵌套
 
     def _calc_crc(self, data: bytes) -> int:
         crc = 0xFFFF
@@ -680,38 +684,43 @@ class ModbusRTUConnector:
         if serial is None:
             print(f"[Modbus RTU] 连接失败 {self.port} -> 缺少 pyserial 依赖，请安装: pip install pyserial")
             return False
-        try:
-            self._ser = serial.Serial(
-                port=self.port,
-                baudrate=self.baudrate,
-                parity=self.parity,
-                stopbits=self.stopbits,
-                bytesize=self.bytesize,
-                timeout=self.timeout,
-                write_timeout=self.timeout
-            )
-            return True
-        except Exception as e:
-            print(f"[Modbus RTU] 连接失败 {self.port} -> {e}")
-            self._ser = None
-            return False
+        with self._lock:
+            # 释放可能残留的旧句柄，避免自身占用串口导致重新打开失败（串口连接冲突）
+            self.disconnect()
+            try:
+                self._ser = serial.Serial(
+                    port=self.port,
+                    baudrate=self.baudrate,
+                    parity=self.parity,
+                    stopbits=self.stopbits,
+                    bytesize=self.bytesize,
+                    timeout=self.timeout,
+                    write_timeout=self.timeout
+                )
+                return True
+            except Exception as e:
+                print(f"[Modbus RTU] 连接失败 {self.port} -> {e}")
+                self._ser = None
+                return False
 
     def disconnect(self):
-        if self._ser:
-            try:
-                self._ser.close()
-            except Exception:
-                pass
-            self._ser = None
+        with self._lock:
+            if self._ser:
+                try:
+                    self._ser.close()
+                except Exception:
+                    pass
+                self._ser = None
 
     def is_connected(self) -> bool:
-        return self._ser is not None and self._ser.is_open
+        ser = self._ser  # 单次读取引用，避免 connect/disconnect 并发时两次读 _ser 之间被置 None
+        return ser is not None and ser.is_open
 
     def _send_request(self, func_code: int, start_addr: int,
                       quantity: int) -> Optional[bytes]:
-        if not self._ser or not self._ser.is_open:
-            return None
         with self._lock:
+            if not self._ser or not self._ser.is_open:
+                return None
             try:
                 frame = self._build_frame(func_code, start_addr, quantity)
                 self._ser.flushInput()
@@ -826,9 +835,9 @@ class ModbusRTUConnector:
 
     def _send_write_request(self, func_code: int, pdu_body: bytes) -> bool:
         """发送写请求并验证响应。返回 True 表示写入成功。"""
-        if not self._ser or not self._ser.is_open:
-            return False
         with self._lock:
+            if not self._ser or not self._ser.is_open:
+                return False
             try:
                 frame = self._build_write_frame(func_code, pdu_body)
                 self._ser.flushInput()
@@ -912,7 +921,7 @@ class ModbusASCIIConnector:
         self.stopbits = stopbits
         self.bytesize = bytesize
         self._ser = None
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()  # 可重入：允许 connect()→disconnect()、_send_request异常→disconnect() 同线程嵌套
 
     def _calc_lrc(self, data: bytes) -> int:
         lrc = 0
@@ -954,38 +963,43 @@ class ModbusASCIIConnector:
         if serial is None:
             print(f"[Modbus ASCII] 连接失败 {self.port} -> 缺少 pyserial 依赖，请安装: pip install pyserial")
             return False
-        try:
-            self._ser = serial.Serial(
-                port=self.port,
-                baudrate=self.baudrate,
-                parity=self.parity,
-                stopbits=self.stopbits,
-                bytesize=self.bytesize,
-                timeout=self.timeout,
-                write_timeout=self.timeout
-            )
-            return True
-        except Exception as e:
-            print(f"[Modbus ASCII] 连接失败 {self.port} -> {e}")
-            self._ser = None
-            return False
+        with self._lock:
+            # 释放可能残留的旧句柄，避免自身占用串口导致重新打开失败（串口连接冲突）
+            self.disconnect()
+            try:
+                self._ser = serial.Serial(
+                    port=self.port,
+                    baudrate=self.baudrate,
+                    parity=self.parity,
+                    stopbits=self.stopbits,
+                    bytesize=self.bytesize,
+                    timeout=self.timeout,
+                    write_timeout=self.timeout
+                )
+                return True
+            except Exception as e:
+                print(f"[Modbus ASCII] 连接失败 {self.port} -> {e}")
+                self._ser = None
+                return False
 
     def disconnect(self):
-        if self._ser:
-            try:
-                self._ser.close()
-            except Exception:
-                pass
-            self._ser = None
+        with self._lock:
+            if self._ser:
+                try:
+                    self._ser.close()
+                except Exception:
+                    pass
+                self._ser = None
 
     def is_connected(self) -> bool:
-        return self._ser is not None and self._ser.is_open
+        ser = self._ser  # 单次读取引用，避免 connect/disconnect 并发时两次读 _ser 之间被置 None
+        return ser is not None and ser.is_open
 
     def _send_request(self, func_code: int, start_addr: int,
                       quantity: int) -> Optional[bytes]:
-        if not self._ser or not self._ser.is_open:
-            return None
         with self._lock:
+            if not self._ser or not self._ser.is_open:
+                return None
             try:
                 frame = self._build_frame(func_code, start_addr, quantity)
                 self._ser.flushInput()
@@ -1118,9 +1132,9 @@ class ModbusASCIIConnector:
 
     def _send_write_request(self, func_code: int, pdu_body: bytes) -> bool:
         """发送写请求并验证响应。返回 True 表示写入成功。"""
-        if not self._ser or not self._ser.is_open:
-            return False
         with self._lock:
+            if not self._ser or not self._ser.is_open:
+                return False
             try:
                 frame = self._build_write_frame(func_code, pdu_body)
                 self._ser.flushInput()
@@ -1213,34 +1227,38 @@ class KeyencePLCConnector:
         self.timeout = timeout
         self.unit = unit
         self._sock: Optional[socket.socket] = None
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()  # 可重入：允许 connect()→disconnect()、_send_command异常→disconnect() 同线程嵌套
 
     def connect(self) -> bool:
-        try:
-            self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self._sock.settimeout(self.timeout)
-            self._sock.connect((self.host, self.port))
-            return True
-        except Exception as e:
-            print(f"[Keyence] 连接失败 {self.host}:{self.port} -> {e}")
-            self._sock = None
-            return False
+        with self._lock:
+            # 释放可能残留的旧句柄，避免重连时旧 socket 泄漏/冲突
+            self.disconnect()
+            try:
+                self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self._sock.settimeout(self.timeout)
+                self._sock.connect((self.host, self.port))
+                return True
+            except Exception as e:
+                print(f"[Keyence] 连接失败 {self.host}:{self.port} -> {e}")
+                self._sock = None
+                return False
 
     def disconnect(self):
-        if self._sock:
-            try:
-                self._sock.close()
-            except Exception:
-                pass
-            self._sock = None
+        with self._lock:
+            if self._sock:
+                try:
+                    self._sock.close()
+                except Exception:
+                    pass
+                self._sock = None
 
     def is_connected(self) -> bool:
         return self._sock is not None
 
     def _send_command(self, cmd: str) -> Optional[str]:
-        if not self._sock:
-            return None
         with self._lock:
+            if not self._sock:
+                return None
             full_cmd = cmd + "\r\n"
             try:
                 self._sock.sendall(full_cmd.encode("ascii"))
@@ -1832,7 +1850,7 @@ class AcquisitionWorker(QObject):
 
     def _run_loop(self):
         # 连接所有设备
-        for conn_id, info in self._connections.items():
+        for conn_id, info in list(self._connections.items()):
             connector = info["connector"]
             ok = connector.connect()
             if isinstance(connector, ModbusRTUConnector) or isinstance(connector, ModbusASCIIConnector):
@@ -1878,7 +1896,7 @@ class AcquisitionWorker(QObject):
             time.sleep(self._poll_interval)
 
         # 清理
-        for conn_id, info in self._connections.items():
+        for conn_id, info in list(self._connections.items()):
             info["connector"].disconnect()
             self.connection_status.emit(conn_id, False, "已断开")
 
@@ -2122,8 +2140,10 @@ class ChartWidget(pg.PlotWidget):
         self.setMinimumHeight(200)
         self.setBackground("#eff1f5")
         self.setTitle(title, color="#4c4f69", size="10pt")
-        self.setLabel("left", color="#4c4f69")
+        self.setLabel("right", color="#4c4f69")
         self.setLabel("bottom", "时间(s)", color="#4c4f69")
+        self.showAxis("right")
+        self.hideAxis("left")
         self.showGrid(x=True, y=True, alpha=0.3)
         self._curves = {}
         self._colors = [
@@ -3140,6 +3160,18 @@ class MainWindow(QMainWindow):
         if conn_id in self._connections:
             QMessageBox.warning(self, "警告", f"连接ID '{conn_id}' 已存在")
             return
+        # 串口冲突检测：避免多个连接指向同一物理串口，否则后打开者会因自身占用而失败
+        if conn_type in ("modbus_rtu", "modbus_ascii"):
+            new_port = str(params.get("port", "")).strip().lower()
+            if new_port:
+                for cid, info in self._connections.items():
+                    if info["type"] in ("modbus_rtu", "modbus_ascii") and \
+                       str(info["params"].get("port", "")).strip().lower() == new_port:
+                        QMessageBox.warning(self, "串口冲突",
+                            f"串口 '{params.get('port')}' 已被连接 '{cid}' 占用。\n\n"
+                            f"同一物理串口同一时刻只能被一个连接打开，"
+                            f"否则后打开的连接会因自身占用导致连接失败。")
+                        return
         self._connections[conn_id] = {"type": conn_type, "params": params}
         self.worker.add_connection(conn_id, conn_type, **params)
         self._refresh_conn_table()

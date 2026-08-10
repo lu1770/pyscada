@@ -1,0 +1,638 @@
+# ================================================================
+# 台达 DELTA DTE10T 温度控制器 - 配置文件
+# 功能: 将全部 8 通道切换为手动模式，并写入输出功率 50%
+# ================================================================
+
+# ---------------------------
+# 全局配置
+# ---------------------------
+poll_interval: 0.5
+
+# ---------------------------
+# 设备连接配置
+# ---------------------------
+connections:
+  delta_dte10t:
+    type: modbus_rtu
+    params:
+      port: COM8
+      baudrate: 115200
+      bytesize: 8
+      parity: E
+      stopbits: 1
+      slave_id: 1
+      timeout: 1.0
+
+# ---------------------------
+# 采集任务配置（读取通道状态）
+# ---------------------------
+tasks:
+  # 第一组输出功率（CH1~CH8），单位 0.1%
+  - task_id: task_out1_ch1
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4208
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: out1_ch1
+    channel_name: CH1输出功率1
+    unit: '%'
+    scale: 0.1
+    offset: 0
+
+  - task_id: task_out1_ch2
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4209
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: out1_ch2
+    channel_name: CH2输出功率1
+    unit: '%'
+    scale: 0.1
+    offset: 0
+
+  - task_id: task_out1_ch3
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4210
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: out1_ch3
+    channel_name: CH3输出功率1
+    unit: '%'
+    scale: 0.1
+    offset: 0
+
+  - task_id: task_out1_ch4
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4211
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: out1_ch4
+    channel_name: CH4输出功率1
+    unit: '%'
+    scale: 0.1
+    offset: 0
+
+  - task_id: task_out1_ch5
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4212
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: out1_ch5
+    channel_name: CH5输出功率1
+    unit: '%'
+    scale: 0.1
+    offset: 0
+
+  - task_id: task_out1_ch6
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4213
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: out1_ch6
+    channel_name: CH6输出功率1
+    unit: '%'
+    scale: 0.1
+    offset: 0
+
+  - task_id: task_out1_ch7
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4214
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: out1_ch7
+    channel_name: CH7输出功率1
+    unit: '%'
+    scale: 0.1
+    offset: 0
+
+  - task_id: task_out1_ch8
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4215
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: out1_ch8
+    channel_name: CH8输出功率1
+    unit: '%'
+    scale: 0.1
+    offset: 0
+
+  # 第二组输出功率（CH1~CH8），单位 0.1%
+  - task_id: task_out2_ch1
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4216
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: out2_ch1
+    channel_name: CH1输出功率2
+    unit: '%'
+    scale: 0.1
+    offset: 0
+
+  - task_id: task_out2_ch2
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4217
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: out2_ch2
+    channel_name: CH2输出功率2
+    unit: '%'
+    scale: 0.1
+    offset: 0
+
+  - task_id: task_out2_ch3
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4218
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: out2_ch3
+    channel_name: CH3输出功率2
+    unit: '%'
+    scale: 0.1
+    offset: 0
+
+  - task_id: task_out2_ch4
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4219
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: out2_ch4
+    channel_name: CH4输出功率2
+    unit: '%'
+    scale: 0.1
+    offset: 0
+
+  - task_id: task_out2_ch5
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4220
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: out2_ch5
+    channel_name: CH5输出功率2
+    unit: '%'
+    scale: 0.1
+    offset: 0
+
+  - task_id: task_out2_ch6
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4221
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: out2_ch6
+    channel_name: CH6输出功率2
+    unit: '%'
+    scale: 0.1
+    offset: 0
+
+  - task_id: task_out2_ch7
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4222
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: out2_ch7
+    channel_name: CH7输出功率2
+    unit: '%'
+    scale: 0.1
+    offset: 0
+
+  - task_id: task_out2_ch8
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4223
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: out2_ch8
+    channel_name: CH8输出功率2
+    unit: '%'
+    scale: 0.1
+    offset: 0
+
+  # 控制模式状态（CH1~CH8），读取确认当前模式
+  - task_id: task_mode_ch1
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4280
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: mode_ch1
+    channel_name: CH1控制模式
+    unit: ''
+    scale: 1.0
+    offset: 0
+
+  - task_id: task_mode_ch2
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4281
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: mode_ch2
+    channel_name: CH2控制模式
+    unit: ''
+    scale: 1.0
+    offset: 0
+
+  - task_id: task_mode_ch3
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4282
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: mode_ch3
+    channel_name: CH3控制模式
+    unit: ''
+    scale: 1.0
+    offset: 0
+
+  - task_id: task_mode_ch4
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4283
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: mode_ch4
+    channel_name: CH4控制模式
+    unit: ''
+    scale: 1.0
+    offset: 0
+
+  - task_id: task_mode_ch5
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4284
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: mode_ch5
+    channel_name: CH5控制模式
+    unit: ''
+    scale: 1.0
+    offset: 0
+
+  - task_id: task_mode_ch6
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4285
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: mode_ch6
+    channel_name: CH6控制模式
+    unit: ''
+    scale: 1.0
+    offset: 0
+
+  - task_id: task_mode_ch7
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4286
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: mode_ch7
+    channel_name: CH7控制模式
+    unit: ''
+    scale: 1.0
+    offset: 0
+
+  - task_id: task_mode_ch8
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4287
+    quantity: 1
+    data_type: uint16
+    byte_order: abcd
+    channel_prefix: mode_ch8
+    channel_name: CH8控制模式
+    unit: ''
+    scale: 1.0
+    offset: 0
+
+# ---------------------------
+# 写入任务配置
+# ---------------------------
+write_tasks:
+  # ===== 步骤1: 切换全部 8 通道为手动模式（写入 1） =====
+  - task_id: wtask_mode_ch1
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4280
+    value: 1.0
+    write_interval: 0.5
+    data_type: uint16
+    byte_order: abcd
+    name: 写入CH1手动模式
+
+  - task_id: wtask_mode_ch2
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4281
+    value: 1.0
+    write_interval: 0.5
+    data_type: uint16
+    byte_order: abcd
+    name: 写入CH2手动模式
+
+  - task_id: wtask_mode_ch3
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4282
+    value: 1.0
+    write_interval: 0.5
+    data_type: uint16
+    byte_order: abcd
+    name: 写入CH3手动模式
+
+  - task_id: wtask_mode_ch4
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4283
+    value: 1.0
+    write_interval: 0.5
+    data_type: uint16
+    byte_order: abcd
+    name: 写入CH4手动模式
+
+  - task_id: wtask_mode_ch5
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4284
+    value: 1.0
+    write_interval: 0.5
+    data_type: uint16
+    byte_order: abcd
+    name: 写入CH5手动模式
+
+  - task_id: wtask_mode_ch6
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4285
+    value: 1.0
+    write_interval: 0.5
+    data_type: uint16
+    byte_order: abcd
+    name: 写入CH6手动模式
+
+  - task_id: wtask_mode_ch7
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4286
+    value: 1.0
+    write_interval: 0.5
+    data_type: uint16
+    byte_order: abcd
+    name: 写入CH7手动模式
+
+  - task_id: wtask_mode_ch8
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4287
+    value: 1.0
+    write_interval: 0.5
+    data_type: uint16
+    byte_order: abcd
+    name: 写入CH8手动模式
+
+  # ===== 步骤2: 写入第一组输出功率 50%（写入 500，单位 0.1%） =====
+  - task_id: wtask_out1_ch1
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4208
+    value: 500.0
+    write_interval: 0.5
+    data_type: uint16
+    byte_order: abcd
+    name: 写入CH1输出功率1 50%
+
+  - task_id: wtask_out1_ch2
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4209
+    value: 500.0
+    write_interval: 0.5
+    data_type: uint16
+    byte_order: abcd
+    name: 写入CH2输出功率1 50%
+
+  - task_id: wtask_out1_ch3
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4210
+    value: 500.0
+    write_interval: 0.5
+    data_type: uint16
+    byte_order: abcd
+    name: 写入CH3输出功率1 50%
+
+  - task_id: wtask_out1_ch4
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4211
+    value: 500.0
+    write_interval: 0.5
+    data_type: uint16
+    byte_order: abcd
+    name: 写入CH4输出功率1 50%
+
+  - task_id: wtask_out1_ch5
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4212
+    value: 500.0
+    write_interval: 0.5
+    data_type: uint16
+    byte_order: abcd
+    name: 写入CH5输出功率1 50%
+
+  - task_id: wtask_out1_ch6
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4213
+    value: 500.0
+    write_interval: 0.5
+    data_type: uint16
+    byte_order: abcd
+    name: 写入CH6输出功率1 50%
+
+  - task_id: wtask_out1_ch7
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4214
+    value: 500.0
+    write_interval: 0.5
+    data_type: uint16
+    byte_order: abcd
+    name: 写入CH7输出功率1 50%
+
+  - task_id: wtask_out1_ch8
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4215
+    value: 500.0
+    write_interval: 0.5
+    data_type: uint16
+    byte_order: abcd
+    name: 写入CH8输出功率1 50%
+
+  # ===== 步骤3: 写入第二组输出功率 50%（写入 500，单位 0.1%） =====
+  - task_id: wtask_out2_ch1
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4216
+    value: 500.0
+    write_interval: 0.5
+    data_type: uint16
+    byte_order: abcd
+    name: 写入CH1输出功率2 50%
+
+  - task_id: wtask_out2_ch2
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4217
+    value: 500.0
+    write_interval: 0.5
+    data_type: uint16
+    byte_order: abcd
+    name: 写入CH2输出功率2 50%
+
+  - task_id: wtask_out2_ch3
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4218
+    value: 500.0
+    write_interval: 0.5
+    data_type: uint16
+    byte_order: abcd
+    name: 写入CH3输出功率2 50%
+
+  - task_id: wtask_out2_ch4
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4219
+    value: 500.0
+    write_interval: 0.5
+    data_type: uint16
+    byte_order: abcd
+    name: 写入CH4输出功率2 50%
+
+  - task_id: wtask_out2_ch5
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4220
+    value: 500.0
+    write_interval: 0.5
+    data_type: uint16
+    byte_order: abcd
+    name: 写入CH5输出功率2 50%
+
+  - task_id: wtask_out2_ch6
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4221
+    value: 500.0
+    write_interval: 0.5
+    data_type: uint16
+    byte_order: abcd
+    name: 写入CH6输出功率2 50%
+
+  - task_id: wtask_out2_ch7
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4222
+    value: 500.0
+    write_interval: 0.5
+    data_type: uint16
+    byte_order: abcd
+    name: 写入CH7输出功率2 50%
+
+  - task_id: wtask_out2_ch8
+    connection_id: delta_dte10t
+    connection_type: modbus_rtu
+    device_type: holding
+    start_addr: 4223
+    value: 500.0
+    write_interval: 0.5
+    data_type: uint16
+    byte_order: abcd
+    name: 写入CH8输出功率2 50%
