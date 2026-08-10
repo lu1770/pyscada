@@ -71,14 +71,14 @@ calc_tasks:
   unit: ℃
 - channel_name: 下层PWM调节值
   channel_prefix: calc_lower_pwm
-  formula: min(max(heater_duty_lower_mid-(task_temp_ch2*2-task_temp_ch1-task_temp_ch3)*0.5-task_temp_ch1-task_temp_ch3,0),100)
+  formula: min(max((heater_duty_lower_mid-(task_temp_ch2*2-task_temp_ch1-task_temp_ch3)*0.5),0),100)
   offset: 0.0
   scale: 1.0
   task_id: calc_pwm_1785919067209
   unit: '%'
 - channel_name: 中层下面PWM调节值
   channel_prefix: calc_mid_lower_pwm
-  formula: min(max(heater_duty_mid_lower_mid-(task_temp_ch5*2-task_temp_ch4-task_temp_ch6)*0.5-task_temp_ch4-task_temp_ch6,0),100)
+  formula: min(max((heater_duty_mid_lower_mid-(task_temp_ch5*2-task_temp_ch4-task_temp_ch6)*0.5),0),100)
   offset: 0.0
   scale: 1.0
   task_id: calc_pwm_1785919067210
@@ -235,7 +235,7 @@ calc_write_tasks:
   device_type: DM
   start_addr: 15100
   task_id: pwm_pwm
-  write_interval: 500.0
+  write_interval: 1000.0
 - byte_order: abcd
   name: 中层下面PWM调节值
   connection_id: pwm_plc1
@@ -245,7 +245,7 @@ calc_write_tasks:
   device_type: DM
   start_addr: 15102
   task_id: pwm_mid_lower
-  write_interval: 500.0
+  write_interval: 1000.0
 connections:
   dte_rtu_com9:
     params:
