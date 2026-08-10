@@ -1,0 +1,101 @@
+poll_interval: 15.0
+connections:
+  pwm_plc1:
+    params:
+      host: 192.168.2.80
+      port: 8501
+      timeout: 3.0
+      unit: 0
+    type: keyence
+tasks:
+- byte_order: abcd
+  channel_name: 下层中间两个加热棒占空比DM15100
+  channel_prefix: lower_mid_heater
+  connection_id: pwm_plc1
+  connection_type: keyence
+  data_type: uint16
+  device_type: DM
+  offset: 0
+  quantity: 1
+  scale: 1.0
+  start_addr: 15100
+  task_id: heater_duty_lower_mid
+  unit: '%'
+- byte_order: abcd
+  channel_name: 中层下面中间两个加热棒占空比DM15102
+  channel_prefix: mid_lower_mid_heater
+  connection_id: pwm_plc1
+  connection_type: keyence
+  data_type: uint16
+  device_type: DM
+  offset: 0
+  quantity: 1
+  scale: 1.0
+  start_addr: 15102
+  task_id: heater_duty_mid_lower_mid
+  unit: '%'
+- byte_order: abcd
+  channel_name: 中层上面中间两个加热棒占空比DM15104
+  channel_prefix: mid_upper_mid_heater
+  connection_id: pwm_plc1
+  connection_type: keyence
+  data_type: uint16
+  device_type: DM
+  offset: 0
+  quantity: 1
+  scale: 1.0
+  start_addr: 15104
+  task_id: heater_duty_mid_upper_mid
+  unit: '%'
+- byte_order: abcd
+  channel_name: 上层中间两个加热棒占空比DM15106
+  channel_prefix: upper_mid_heater
+  connection_id: pwm_plc1
+  connection_type: keyence
+  data_type: uint16
+  device_type: DM
+  offset: 0
+  quantity: 1
+  scale: 1.0
+  start_addr: 15106
+  task_id: heater_duty_upper_mid
+  unit: '%'
+calc_tasks:
+# 注意：以下两个 calc_task 的公式引用了 task_temp_ch1~task_temp_ch6，
+# 这些温度任务来自 pt100_rtu_com11 连接，不在本配置文件中。
+# 若单独加载本文件，需同时加载 pt100 温度任务，否则公式无法求值。
+- channel_name: 下层PWM调节值
+  channel_prefix: calc_lower_pwm
+  formula: heater_duty_lower_mid-(task_temp_ch2*2-task_temp_ch1-task_temp_ch3)*0.5-task_temp_ch1-task_temp_ch3
+  offset: 0.0
+  scale: 1.0
+  task_id: calc_pwm_1785919067209
+  unit: '%'
+- channel_name: 中层下面PWM调节值
+  channel_prefix: calc_mid_lower_pwm
+  formula: heater_duty_mid_lower_mid-(task_temp_ch5*2-task_temp_ch4-task_temp_ch6)*0.5-task_temp_ch4-task_temp_ch6
+  offset: 0.0
+  scale: 1.0
+  task_id: calc_pwm_1785919067210
+  unit: '%'
+calc_write_tasks:
+- byte_order: abcd
+  name: 下层PWM调节值
+  connection_id: pwm_plc1
+  connection_type: keyence
+  source_task_id: calc_pwm_1785919067209
+  data_type: uint16
+  device_type: DM
+  start_addr: 15100
+  task_id: pwm_pwm
+  write_interval: 500.0
+- byte_order: abcd
+  name: 中层下面PWM调节值
+  connection_id: pwm_plc1
+  connection_type: keyence
+  source_task_id: calc_pwm_1785919067210
+  data_type: uint16
+  device_type: DM
+  start_addr: 15102
+  task_id: pwm_mid_lower
+  write_interval: 500.0
