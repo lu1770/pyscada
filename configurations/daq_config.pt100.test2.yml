@@ -135,7 +135,7 @@ calc_write_tasks:
   source_task_id: calc_1785919067200
   start_addr: 4104
   task_id: calcwrite_1785919993452
-  write_interval: 1000.0
+  write_interval: 2000.0
 - byte_order: abcd
   connection_id: dte_rtu_com9
   connection_type: modbus_rtu
@@ -145,7 +145,7 @@ calc_write_tasks:
   source_task_id: calc_live_ch2_1785919067201
   start_addr: 4105
   task_id: calc_write_sv_ch2_1785919993453
-  write_interval: 1000.0
+  write_interval: 2000.0
 - byte_order: abcd
   connection_id: dte_rtu_com9
   connection_type: modbus_rtu
@@ -155,7 +155,7 @@ calc_write_tasks:
   source_task_id: calc_live_ch4_1785919067204
   start_addr: 4107
   task_id: calc_write_sv_ch4_1785919993455
-  write_interval: 1000.0
+  write_interval: 2000.0
 - byte_order: abcd
   connection_id: dte_rtu_com9
   connection_type: modbus_rtu
@@ -165,7 +165,7 @@ calc_write_tasks:
   source_task_id: calc_1785919067203
   start_addr: 4106
   task_id: calc_write_sv_ch3_1785919993454
-  write_interval: 1000.0
+  write_interval: 2000.0
 - byte_order: abcd
   connection_id: dte_rtu_com9
   connection_type: modbus_rtu
@@ -175,7 +175,7 @@ calc_write_tasks:
   source_task_id: calc_power_ch1
   start_addr: 4208
   task_id: calcwrite_power_4208_ch1
-  write_interval: 1000.0
+  write_interval: 2000.0
 - byte_order: abcd
   connection_id: dte_rtu_com9
   connection_type: modbus_rtu
@@ -185,7 +185,7 @@ calc_write_tasks:
   source_task_id: calc_power_ch2
   start_addr: 4209
   task_id: calcwrite_power_4209_ch2
-  write_interval: 1000.0
+  write_interval: 2000.0
 - byte_order: abcd
   connection_id: dte_rtu_com9
   connection_type: modbus_rtu
@@ -195,7 +195,7 @@ calc_write_tasks:
   source_task_id: calc_power_ch3
   start_addr: 4210
   task_id: calcwrite_power_4210_ch3
-  write_interval: 1000.0
+  write_interval: 2000.0
 - byte_order: abcd
   connection_id: dte_rtu_com9
   connection_type: modbus_rtu
@@ -205,7 +205,7 @@ calc_write_tasks:
   source_task_id: calc_power_ch4
   start_addr: 4211
   task_id: calcwrite_power_4211_ch4
-  write_interval: 1000.0
+  write_interval: 2000.0
 - byte_order: abcd
   connection_id: dte_rtu_com9
   connection_type: modbus_rtu
@@ -215,7 +215,7 @@ calc_write_tasks:
   source_task_id: calc_power_ch5
   start_addr: 4212
   task_id: calcwrite_power_4212_ch5
-  write_interval: 1000.0
+  write_interval: 2000.0
 - byte_order: abcd
   connection_id: dte_rtu_com9
   connection_type: modbus_rtu
@@ -225,7 +225,7 @@ calc_write_tasks:
   source_task_id: calc_power_ch6
   start_addr: 4213
   task_id: calcwrite_power_4213_ch6
-  write_interval: 1000.0
+  write_interval: 2000.0
 - byte_order: abcd
   name: 下层PWM调节值
   connection_id: pwm_plc1
@@ -235,7 +235,7 @@ calc_write_tasks:
   device_type: DM
   start_addr: 15100
   task_id: pwm_pwm
-  write_interval: 1000.0
+  write_interval: 2000.0
 - byte_order: abcd
   name: 中层下面PWM调节值
   connection_id: pwm_plc1
@@ -245,7 +245,7 @@ calc_write_tasks:
   device_type: DM
   start_addr: 15102
   task_id: pwm_mid_lower
-  write_interval: 1000.0
+  write_interval: 2000.0
 connections:
   dte_rtu_com9:
     params:
@@ -569,7 +569,7 @@ write_tasks:
   device_type: holding
   start_addr: 4280
   value: 2.0
-  write_interval: 1000.0
+  write_interval: 2000.0
   data_type: uint16
   byte_order: abcd
   name: 写入CH1手动模式
@@ -580,7 +580,7 @@ write_tasks:
   device_type: holding
   start_addr: 4281
   value: 2.0
-  write_interval: 1000.0
+  write_interval: 2000.0
   data_type: uint16
   byte_order: abcd
   name: 写入CH2手动模式
@@ -591,7 +591,7 @@ write_tasks:
   device_type: holding
   start_addr: 4282
   value: 2.0
-  write_interval: 1000.0
+  write_interval: 2000.0
   data_type: uint16
   byte_order: abcd
   name: 写入CH3手动模式
@@ -602,7 +602,7 @@ write_tasks:
   device_type: holding
   start_addr: 4283
   value: 2.0
-  write_interval: 1000.0
+  write_interval: 2000.0
   data_type: uint16
   byte_order: abcd
   name: 写入CH4手动模式
@@ -613,7 +613,7 @@ write_tasks:
   device_type: holding
   start_addr: 4284
   value: 2.0
-  write_interval: 1000.0
+  write_interval: 2000.0
   data_type: uint16
   byte_order: abcd
   name: 写入CH5手动模式
@@ -624,7 +624,7 @@ write_tasks:
   device_type: holding
   start_addr: 4285
   value: 2.0
-  write_interval: 1000.0
+  write_interval: 2000.0
   data_type: uint16
   byte_order: abcd
   name: 写入CH6手动模式
@@ -635,7 +635,7 @@ write_tasks:
   device_type: holding
   start_addr: 4286
   value: 2.0
-  write_interval: 1000.0
+  write_interval: 2000.0
   data_type: uint16
   byte_order: abcd
   name: 写入CH7手动模式
@@ -646,7 +646,7 @@ write_tasks:
   device_type: holding
   start_addr: 4287
   value: 2.0
-  write_interval: 1000.0
+  write_interval: 2000.0
   data_type: uint16
   byte_order: abcd
   name: 写入CH8手动模式
