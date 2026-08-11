@@ -1,28 +1,28 @@
 calc_tasks:
 - channel_name: 下层SV实时CH1
   channel_prefix: calc_live_ch1
-  formula: min(max(task_sv_ch1*10+(180-task_temp_ch1)*10,1500),2500)
+  formula: min(max(task_sv_ch1*10+(180-task_temp_ch1)*20,1500),2500)
   offset: 0.0
   scale: 1.0
   task_id: calc_1785919067200
   unit: ℃
 - channel_name: 下层SV实时CH2
   channel_prefix: calc_live_ch2
-  formula: min(max(task_sv_ch2*10+(task_temp_ch1-task_temp_ch3)*10,1500),2500)
+  formula: min(max(task_sv_ch2*10+(task_temp_ch1-task_temp_ch3)*20,1500),2500)
   offset: 0.0
   scale: 1.0
   task_id: calc_live_ch2_1785919067201
   unit: ℃
 - channel_name: 上层SV实时CH3
   channel_prefix: calc_live_ch3
-  formula: min(max(task_sv_ch3*10+(180-task_temp_ch4)*10,1500),2500)
+  formula: min(max(task_sv_ch3*10+(180-task_temp_ch4)*20,1500),2500)
   offset: 0.0
   scale: 1.0
   task_id: calc_1785919067203
   unit: ℃
 - channel_name: 上层SV实时CH4
   channel_prefix: calc_live_ch4
-  formula: min(max(task_sv_ch4*10+(task_temp_ch4-task_temp_ch6)*10,1500),2500)
+  formula: min(max(task_sv_ch4*10+(task_temp_ch4-task_temp_ch6)*20,1500),2500)
   offset: 0.0
   scale: 1.0
   task_id: calc_live_ch4_1785919067204
@@ -175,7 +175,7 @@ connections:
 poll_interval: 10.0
 tasks:
 - byte_order: abcd
-  channel_name: 第1路温度
+  channel_name: 第1路温度（下层）
   channel_prefix: temp_ch1
   connection_id: pt100_rtu_com11
   connection_type: modbus_rtu
@@ -188,7 +188,7 @@ tasks:
   task_id: task_temp_ch1
   unit: °C
 - byte_order: abcd
-  channel_name: 第2路温度
+  channel_name: 第2路温度（下层）
   channel_prefix: temp_ch2
   connection_id: pt100_rtu_com11
   connection_type: modbus_rtu
@@ -201,7 +201,7 @@ tasks:
   task_id: task_temp_ch2
   unit: °C
 - byte_order: abcd
-  channel_name: 第3路温度
+  channel_name: 第3路温度（下层）
   channel_prefix: temp_ch3
   connection_id: pt100_rtu_com11
   connection_type: modbus_rtu
@@ -214,7 +214,7 @@ tasks:
   task_id: task_temp_ch3
   unit: °C
 - byte_order: abcd
-  channel_name: 第4路温度
+  channel_name: 第4路温度（上层）
   channel_prefix: temp_ch4
   connection_id: pt100_rtu_com11
   connection_type: modbus_rtu
@@ -227,7 +227,7 @@ tasks:
   task_id: task_temp_ch4
   unit: °C
 - byte_order: abcd
-  channel_name: 第5路温度
+  channel_name: 第5路温度（上层）
   channel_prefix: temp_ch5
   connection_id: pt100_rtu_com11
   connection_type: modbus_rtu
@@ -240,7 +240,7 @@ tasks:
   task_id: task_temp_ch5
   unit: °C
 - byte_order: abcd
-  channel_name: 第6路温度
+  channel_name: 第6路温度（上层）
   channel_prefix: temp_ch6
   connection_id: pt100_rtu_com11
   connection_type: modbus_rtu
@@ -253,7 +253,7 @@ tasks:
   task_id: task_temp_ch6
   unit: °C
 - byte_order: abcd
-  channel_name: CH1设定温度
+  channel_name: CH1设定温度（下层）
   channel_prefix: sv_ch1
   connection_id: dte_rtu_com9
   connection_type: modbus_rtu
@@ -266,7 +266,7 @@ tasks:
   task_id: task_sv_ch1
   unit: °C
 - byte_order: abcd
-  channel_name: CH2设定温度
+  channel_name: CH2设定温度（下层）
   channel_prefix: sv_ch2
   connection_id: dte_rtu_com9
   connection_type: modbus_rtu
@@ -279,7 +279,7 @@ tasks:
   task_id: task_sv_ch2
   unit: °C
 - byte_order: abcd
-  channel_name: CH3设定温度
+  channel_name: CH3设定温度（上层）
   channel_prefix: sv_ch3
   connection_id: dte_rtu_com9
   connection_type: modbus_rtu
@@ -292,7 +292,7 @@ tasks:
   task_id: task_sv_ch3
   unit: °C
 - byte_order: abcd
-  channel_name: CH4设定温度
+  channel_name: CH4设定温度（上层）
   channel_prefix: sv_ch4
   connection_id: dte_rtu_com9
   connection_type: modbus_rtu
