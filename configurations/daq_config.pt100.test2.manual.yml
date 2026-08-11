@@ -92,21 +92,21 @@ calc_tasks:
   unit: '%'
 - channel_name: CH2输出功率调节值
   channel_prefix: calc_power_ch2
-  formula: min(max(task_out1_ch2+(180-task_temp_ch2)*1000,0),1000)
+  formula: min(max(task_out1_ch2+(180-task_temp_ch3)*1000,0),1000)
   offset: 0.0
   scale: 1.0
   task_id: calc_power_ch2
   unit: '%'
 - channel_name: CH3输出功率调节值
   channel_prefix: calc_power_ch3
-  formula: min(max(task_out1_ch3+(180-task_temp_ch3)*1000,0),1000)
+  formula: min(max(task_out1_ch3+(180-task_temp_ch4)*1000,0),1000)
   offset: 0.0
   scale: 1.0
   task_id: calc_power_ch3
   unit: '%'
 - channel_name: CH4输出功率调节值
   channel_prefix: calc_power_ch4
-  formula: min(max(task_out1_ch4+(180-task_temp_ch4)*1000,0),1000)
+  formula: min(max(task_out1_ch4+(180-task_temp_ch6)*1000,0),1000)
   offset: 0.0
   scale: 1.0
   task_id: calc_power_ch4
