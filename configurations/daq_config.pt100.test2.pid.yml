@@ -109,6 +109,16 @@ calc_write_tasks:
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
+  name: 设置CH3设定温度SV
+  source_task_id: calc_1785919067203
+  start_addr: 4106
+  task_id: calc_write_sv_ch3_1785919993454
+  write_interval: 1500.0
+- byte_order: abcd
+  connection_id: dte_rtu_com9
+  connection_type: modbus_rtu
+  data_type: uint16
+  device_type: holding
   name: 设置CH4设定温度SV
   source_task_id: calc_live_ch4_1785919067204
   start_addr: 4107
@@ -119,10 +129,20 @@ calc_write_tasks:
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
-  name: 设置CH3设定温度SV
+  name: 设置CH5设定温度SV
   source_task_id: calc_1785919067203
-  start_addr: 4106
-  task_id: calc_write_sv_ch3_1785919993454
+  start_addr: 4108
+  task_id: calc_write_sv_ch5_1785919993456
+  write_interval: 1500.0
+- byte_order: abcd
+  connection_id: dte_rtu_com9
+  connection_type: modbus_rtu
+  data_type: uint16
+  device_type: holding
+  name: 设置CH6设定温度SV
+  source_task_id: calc_live_ch4_1785919067204
+  start_addr: 4109
+  task_id: calc_write_sv_ch6_1785919993457
   write_interval: 1500.0
 - byte_order: abcd
   name: 下层PWM调节值
