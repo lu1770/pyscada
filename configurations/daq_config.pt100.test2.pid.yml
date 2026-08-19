@@ -1,7 +1,7 @@
 calc_tasks:
 - channel_name: 下模下层SV实时CH1
   channel_prefix: calc_live_ch1
-  formula: min(max(task_sv_ch1*10+(180-task_temp_ch1)*10,1500),2500)
+  formula: min(max(task_sv_ch1*10+(175-task_temp_ch1)*10,1500),2500)
   offset: 0.0
   scale: 1.0
   task_id: calc_1785919067200
@@ -15,7 +15,7 @@ calc_tasks:
   unit: ℃
 - channel_name: 下模上层SV实时CH3
   channel_prefix: calc_live_ch3
-  formula: min(max(task_sv_ch3*10+(180-task_temp_ch4)*10,1500),2500)
+  formula: min(max(task_sv_ch3*10+(175-task_temp_ch4)*10,1500),2500)
   offset: 0.0
   scale: 1.0
   task_id: calc_1785919067203
@@ -145,22 +145,22 @@ calc_write_tasks:
   task_id: calc_write_sv_ch6_1785919993457
   write_interval: 1500.0
 - byte_order: abcd
-  name: 下模下层PWM调节值
   connection_id: pwm_plc1
   connection_type: keyence
-  source_task_id: calc_pwm_1785919067209
   data_type: uint16
   device_type: DM
+  name: 下模下层PWM调节值
+  source_task_id: calc_pwm_1785919067209
   start_addr: 15100
   task_id: pwm_pwm
   write_interval: 1500.0
 - byte_order: abcd
-  name: 中层下面PWM调节值
   connection_id: pwm_plc1
   connection_type: keyence
-  source_task_id: calc_pwm_1785919067210
   data_type: uint16
   device_type: DM
+  name: 中层下面PWM调节值
+  source_task_id: calc_pwm_1785919067210
   start_addr: 15102
   task_id: pwm_mid_lower
   write_interval: 1500.0
@@ -324,7 +324,6 @@ tasks:
   start_addr: 4107
   task_id: task_sv_ch4
   unit: °C
-
 - byte_order: abcd
   channel_name: CH5设定温度（上模下层）
   channel_prefix: sv_ch5
@@ -339,7 +338,7 @@ tasks:
   task_id: task_sv_ch5
   unit: °C
 - byte_order: abcd
-  channel_name: CH6设定温度（上模中层）
+  channel_name: CH6设定温度（上模下层）
   channel_prefix: sv_ch6
   connection_id: dte_rtu_com9
   connection_type: modbus_rtu
@@ -352,7 +351,7 @@ tasks:
   task_id: task_sv_ch6
   unit: °C
 - byte_order: abcd
-  channel_name: CH7设定温度（上模中上层）
+  channel_name: CH7设定温度（上模上层）
   channel_prefix: sv_ch7
   connection_id: dte_rtu_com9
   connection_type: modbus_rtu
@@ -377,9 +376,6 @@ tasks:
   start_addr: 4111
   task_id: task_sv_ch8
   unit: °C
-
-
-
 - byte_order: abcd
   channel_name: 下模下层中间两个加热棒占空比DM15100
   channel_prefix: lower_mid_heater
@@ -537,90 +533,83 @@ tasks:
   task_id: task_out1_ch8
   unit: '%'
 write_tasks:
-- task_id: wtask_mode_ch1
+- byte_order: abcd
   connection_id: dte_rtu_com9
   connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 4280
-  value: 0.0
-  write_interval: 1500.0
   data_type: uint16
-  byte_order: abcd
+  device_type: holding
   name: 写入CH1的PID模式
-
-- task_id: wtask_mode_ch2
-  connection_id: dte_rtu_com9
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 4281
+  start_addr: 4280
+  task_id: wtask_mode_ch1
   value: 0.0
   write_interval: 1500.0
+- byte_order: abcd
+  connection_id: dte_rtu_com9
+  connection_type: modbus_rtu
   data_type: uint16
-  byte_order: abcd
+  device_type: holding
   name: 写入CH2的PID模式
-
-- task_id: wtask_mode_ch3
-  connection_id: dte_rtu_com9
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 4282
+  start_addr: 4281
+  task_id: wtask_mode_ch2
   value: 0.0
   write_interval: 1500.0
+- byte_order: abcd
+  connection_id: dte_rtu_com9
+  connection_type: modbus_rtu
   data_type: uint16
-  byte_order: abcd
+  device_type: holding
   name: 写入CH3的PID模式
-
-- task_id: wtask_mode_ch4
-  connection_id: dte_rtu_com9
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 4283
+  start_addr: 4282
+  task_id: wtask_mode_ch3
   value: 0.0
   write_interval: 1500.0
+- byte_order: abcd
+  connection_id: dte_rtu_com9
+  connection_type: modbus_rtu
   data_type: uint16
-  byte_order: abcd
+  device_type: holding
   name: 写入CH4的PID模式
-
-- task_id: wtask_mode_ch5
-  connection_id: dte_rtu_com9
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 4284
+  start_addr: 4283
+  task_id: wtask_mode_ch4
   value: 0.0
   write_interval: 1500.0
+- byte_order: abcd
+  connection_id: dte_rtu_com9
+  connection_type: modbus_rtu
   data_type: uint16
-  byte_order: abcd
+  device_type: holding
   name: 写入CH5的PID模式
-
-- task_id: wtask_mode_ch6
-  connection_id: dte_rtu_com9
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 4285
+  start_addr: 4284
+  task_id: wtask_mode_ch5
   value: 0.0
   write_interval: 1500.0
+- byte_order: abcd
+  connection_id: dte_rtu_com9
+  connection_type: modbus_rtu
   data_type: uint16
-  byte_order: abcd
+  device_type: holding
   name: 写入CH6的PID模式
-
-- task_id: wtask_mode_ch7
-  connection_id: dte_rtu_com9
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 4286
+  start_addr: 4285
+  task_id: wtask_mode_ch6
   value: 0.0
   write_interval: 1500.0
+- byte_order: abcd
+  connection_id: dte_rtu_com9
+  connection_type: modbus_rtu
   data_type: uint16
-  byte_order: abcd
+  device_type: holding
   name: 写入CH7的PID模式
-
-- task_id: wtask_mode_ch8
-  connection_id: dte_rtu_com9
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 4287
+  start_addr: 4286
+  task_id: wtask_mode_ch7
   value: 0.0
   write_interval: 1500.0
+- byte_order: abcd
+  connection_id: dte_rtu_com9
+  connection_type: modbus_rtu
   data_type: uint16
-  byte_order: abcd
+  device_type: holding
   name: 写入CH8的PID模式
+  start_addr: 4287
+  task_id: wtask_mode_ch8
+  value: 0.0
+  write_interval: 1500.0
