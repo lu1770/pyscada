@@ -44,7 +44,7 @@ from PySide6.QtWidgets import (
     QGridLayout, QLabel, QLineEdit, QPushButton, QComboBox,
     QTableWidget, QTableWidgetItem, QHeaderView, QGroupBox,
     QMessageBox, QFileDialog, QSpinBox, QDoubleSpinBox,
-    QStatusBar, QSplitter, QScrollArea
+    QStatusBar, QSplitter, QScrollArea, QTabWidget
 )
 from PySide6.QtGui import QColor
 import pyqtgraph as pg
@@ -2172,6 +2172,174 @@ class ChartWidget(pg.PlotWidget):
 
 
 # ================================================================
+#  第五部分(续): 磁贴显示组件
+# ================================================================
+class TileWidget(QWidget):
+    """单个通道磁贴卡片，显示通道名称、最新值和单位"""
+
+    _COLORS = [
+        "#f38ba8", "#fab387", "#f9e2af", "#a6e3a1",
+        "#94e2d5", "#89dceb", "#b4befe", "#cba6f7"
+    ]
+
+    def __init__(self, channel_id: str, name: str, unit: str = "",
+                 color_index: int = 0, parent=None):
+        super().__init__(parent)
+        self.channel_id = channel_id
+        self.unit = unit or ""
+        accent = self._COLORS[color_index % len(self._COLORS)]
+
+        # QWidget 子类需启用 styledBackground 才会绘制样式表背景
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        self.setObjectName("TileFrame")
+        self.setStyleSheet(f"""
+            QWidget#TileFrame {{
+                background-color: #ffffff;
+                border: 1px solid #bcc0cc;
+                border-left: 4px solid {accent};
+                border-radius: 8px;
+            }}
+            QLabel#TileName {{ color: #4c4f69; font-size: 12px; font-weight: 600; }}
+            QLabel#TileValue {{ color: {accent}; font-size: 24px; font-weight: bold; }}
+            QLabel#TileUnit {{ color: #6c7086; font-size: 11px; }}
+        """)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setSpacing(2)
+
+        self.name_label = QLabel(name)
+        self.name_label.setObjectName("TileName")
+        self.name_label.setWordWrap(True)
+        layout.addWidget(self.name_label)
+
+        self.value_label = QLabel("--")
+        self.value_label.setObjectName("TileValue")
+        self.value_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.value_label, stretch=1)
+
+        unit_row = QHBoxLayout()
+        unit_row.addStretch()
+        self.unit_label = QLabel(self.unit)
+        self.unit_label.setObjectName("TileUnit")
+        unit_row.addWidget(self.unit_label)
+        unit_row.addStretch()
+        layout.addLayout(unit_row)
+
+        self.setMinimumSize(160, 110)
+
+    def update_value(self, value):
+        if value is None:
+            self.value_label.setText("--")
+            return
+        try:
+            self.value_label.setText(f"{float(value):.3f}")
+        except (TypeError, ValueError):
+            self.value_label.setText(str(value))
+
+    def set_name(self, name: str):
+        self.name_label.setText(name or "")
+
+
+class TileDisplayWidget(QWidget):
+    """磁贴显示容器，按网格排列各通道磁贴；与统计图选项卡共享数据源"""
+
+    def __init__(self, columns: int = 4, parent=None):
+        super().__init__(parent)
+        self._columns = max(1, columns)
+        self._tiles = {}            # channel_id -> TileWidget
+        self._color_counter = 0    # 颜色循环计数
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        self._placeholder = QLabel(
+            "📝 暂无通道数据\n\n"
+            "请添加采集任务并开始采集后查看磁贴显示\n"
+            "可切换到「统计图」选项卡查看实时折线图"
+        )
+        self._placeholder.setAlignment(Qt.AlignCenter)
+        self._placeholder.setStyleSheet("color: #6c7086; font-size: 14px; padding: 80px;")
+        outer.addWidget(self._placeholder, stretch=1)
+
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.container = QWidget()
+        self.container.setStyleSheet("background-color: #e6e9ef;")
+        self.grid = QGridLayout(self.container)
+        self.grid.setAlignment(Qt.AlignTop)
+        self.grid.setSpacing(10)
+        self.grid.setContentsMargins(10, 10, 10, 10)
+        self.scroll.setWidget(self.container)
+        outer.addWidget(self.scroll, stretch=1)
+        self.scroll.setVisible(False)  # 初始无通道时隐藏滚动区，占位提示居中
+
+    def add_channel(self, channel_id: str, name: str, unit: str = ""):
+        if channel_id in self._tiles:
+            return
+        # 首个通道加入时切换为滚动区显示
+        if not self._tiles:
+            self._placeholder.setVisible(False)
+            self.scroll.setVisible(True)
+        tile = TileWidget(channel_id, name, unit,
+                          color_index=self._color_counter)
+        self._color_counter += 1
+        idx = len(self._tiles)
+        row, col = idx // self._columns, idx % self._columns
+        self.grid.addWidget(tile, row, col)
+        self._tiles[channel_id] = tile
+
+    def has_channel(self, channel_id: str) -> bool:
+        return channel_id in self._tiles
+
+    def update_channel(self, channel_id: str, value):
+        tile = self._tiles.get(channel_id)
+        if tile is not None:
+            tile.update_value(value)
+
+    def set_channel_name(self, channel_id: str, name: str):
+        tile = self._tiles.get(channel_id)
+        if tile is not None:
+            tile.set_name(name)
+
+    def remove_channel(self, channel_id: str):
+        tile = self._tiles.pop(channel_id, None)
+        if tile is None:
+            return
+        self.grid.removeWidget(tile)
+        tile.setParent(None)
+        tile.deleteLater()
+        self._rebuild_grid()
+
+    def _rebuild_grid(self):
+        # 重新铺排剩余磁贴到紧凑网格位置，避免删除后留空位
+        tiles = list(self._tiles.values())
+        for tile in tiles:
+            self.grid.removeWidget(tile)
+        for idx, tile in enumerate(tiles):
+            row, col = idx // self._columns, idx % self._columns
+            self.grid.addWidget(tile, row, col)
+        if not tiles:
+            self._placeholder.setVisible(True)
+            self.scroll.setVisible(False)
+
+    def clear_all(self):
+        for tile in list(self._tiles.values()):
+            tile.setParent(None)
+            tile.deleteLater()
+        self._tiles.clear()
+        self._color_counter = 0
+        self._placeholder.setVisible(True)
+        self.scroll.setVisible(False)
+
+    def reset_values(self):
+        """仅清空磁贴显示值（保留磁贴卡片本身），与图表清空曲线语义一致"""
+        for tile in self._tiles.values():
+            tile.update_value(None)
+
+
+# ================================================================
 #  第六部分: 连接配置对话框
 # ================================================================
 class ConnectionConfigDialog(QWidget):
@@ -3091,16 +3259,25 @@ class MainWindow(QMainWindow):
 
         splitter.addWidget(left_panel)
 
-        # 右: 图表
+        # 右: 图表与磁贴（选项卡切换）
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+
+        self.tab_widget = QTabWidget()
+        self.tab_widget.setDocumentMode(True)
+
+        # 选项卡 1: 统计图
+        chart_tab = QWidget()
+        chart_tab_layout = QVBoxLayout(chart_tab)
+        chart_tab_layout.setContentsMargins(0, 0, 0, 0)
         self.chart_scroll = QScrollArea()
         self.chart_scroll.setWidgetResizable(True)
         self.chart_scroll_widget = QWidget()
         self.chart_container = QVBoxLayout(self.chart_scroll_widget)
         self.chart_container.setAlignment(Qt.AlignTop)
         self.chart_scroll.setWidget(self.chart_scroll_widget)
-        right_layout.addWidget(self.chart_scroll)
+        chart_tab_layout.addWidget(self.chart_scroll)
 
         self._placeholder_label = QLabel(
             "📝 请添加连接和采集任务后开始采集\n\n"
@@ -3113,7 +3290,13 @@ class MainWindow(QMainWindow):
         self._placeholder_label.setAlignment(Qt.AlignCenter)
         self._placeholder_label.setStyleSheet("color: #6c7086; font-size: 14px; padding: 80px;")
         self.chart_container.addWidget(self._placeholder_label)
+        self.tab_widget.addTab(chart_tab, "📊 统计图")
 
+        # 选项卡 2: 磁贴
+        self.tile_display = TileDisplayWidget(columns=4)
+        self.tab_widget.addTab(self.tile_display, "🔲 磁贴")
+
+        right_layout.addWidget(self.tab_widget)
         splitter.addWidget(right_panel)
         splitter.setSizes([450, 950])
         main_layout.addWidget(splitter, stretch=1)
@@ -3313,6 +3496,8 @@ class MainWindow(QMainWindow):
             k: v for k, v in self._channel_to_chart.items()
             if v != chart_id
         }
+        # 同步删除磁贴（计算任务的通道 id 即 channel_prefix）
+        self.tile_display.remove_channel(task.channel_prefix)
         self.status_bar.showMessage(f"已删除计算任务: {task.channel_name}", 3000)
 
     @_safe_event
@@ -3340,6 +3525,11 @@ class MainWindow(QMainWindow):
             if cid not in self._channel_to_chart:
                 chart.add_channel(cid, cname)
                 self._channel_to_chart[cid] = chart_id
+            # 同步创建磁贴（计算通道单位取自任务配置）
+            if not self.tile_display.has_channel(cid):
+                meta = self.store.get_channel_meta(cid)
+                self.tile_display.add_channel(cid, cname,
+                                              meta.get("unit", task.unit))
 
     # ---- 写入任务管理 ----
     @_safe_event
@@ -3604,6 +3794,11 @@ class MainWindow(QMainWindow):
             if cid not in self._channel_to_chart:
                 chart.add_channel(cid, cname)
                 self._channel_to_chart[cid] = chart_id
+            # 同步创建磁贴（单位取自通道元数据）
+            if not self.tile_display.has_channel(cid):
+                meta = self.store.get_channel_meta(cid)
+                self.tile_display.add_channel(cid, cname,
+                                              meta.get("unit", ""))
 
     # ---- 采集控制 ----
     @_safe_event
@@ -3680,18 +3875,25 @@ class MainWindow(QMainWindow):
             self.store.clear()
             for chart in self._chart_widgets.values():
                 chart.clear_all()
+            # 同步清空磁贴显示值（保留卡片本身，与图表清空曲线一致）
+            self.tile_display.reset_values()
             self._refresh_status()
             self.status_bar.showMessage("数据已清空", 3000)
 
     # ---- 定时刷新 ----
     @_safe_event
     def _refresh_charts(self):
+        # 刷新统计图折线
         for chart_id, chart in self._chart_widgets.items():
             for ch_id, cid in list(self._channel_to_chart.items()):
                 if cid == chart_id:
                     ts, vals = self.store.get_channel_data(ch_id)
                     if ts:
                         chart.update_channel(ch_id, ts, vals)
+        # 同步刷新磁贴最新值（遍历所有已注册通道，含计算通道）
+        for ch_id in self.store.get_all_channel_ids():
+            self.tile_display.update_channel(ch_id,
+                                            self.store.get_latest_value(ch_id))
 
     @_safe_event
     def _refresh_status(self):
@@ -3794,6 +3996,9 @@ class MainWindow(QMainWindow):
             chart.deleteLater()
         self._chart_widgets.clear()
         self._channel_to_chart.clear()
+        # 同步清空磁贴，加载新配置后由 _add_task 重新创建
+        self.tile_display.clear_all()
+        self._placeholder_label.setVisible(True)
 
         for cid, info in config.get("connections", {}).items():
             self._add_connection(cid, info["type"], info["params"])
