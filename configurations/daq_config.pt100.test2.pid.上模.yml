@@ -1,100 +1,99 @@
 calc_tasks:
-# ========== 3层 上模具下层 PT100 CH1 CH2 CH3  SV:CH5 CH6 ==========
-- channel_name: 3层上模具下层SV实时CH5
+# ========== 3 上下 PT100 CH1 CH2 CH3  SV:CH5 CH6 ==========
+- channel_name: "3上下SVCH5 | min(max(task_sv_ch5*10+(175-task_temp_ch1)*10,1500),2500)"
   channel_prefix: calc_live_ch5
   formula: min(max(task_sv_ch5*10+(175-task_temp_ch1)*10,1500),2500)
   offset: 0.0
   scale: 1.0
   task_id: calc_live_ch5_1785919067211
   unit: ℃
-- channel_name: 3层上模具下层SV实时CH6
+- channel_name: "3上下SVCH6 | min(max(task_sv_ch6*10+(task_temp_ch1-task_temp_ch3)*10,1500),2500)"
   channel_prefix: calc_live_ch6
   formula: min(max(task_sv_ch6*10+(task_temp_ch1-task_temp_ch3)*10,1500),2500)
   offset: 0.0
   scale: 1.0
   task_id: calc_live_ch6_1785919067212
   unit: ℃
-- channel_name: 3层上模具下层SV‑实际温度差CH5
+- channel_name: "3上下SV‑实际温度差CH5 | task_sv_ch5-task_temp_ch1"
   channel_prefix: calc_live_ch5_diff
   formula: task_sv_ch5-task_temp_ch1
   offset: 0.0
   scale: 1.0
   task_id: calc_diff_3layer_01
   unit: ℃
-- channel_name: 3层上模具下层倾斜(CH1‑CH3)
+- channel_name: "3上下倾斜(CH1‑CH3) | task_temp_ch1-task_temp_ch3"
   channel_prefix: calc_3layer_tilt
   formula: task_temp_ch1-task_temp_ch3
   offset: 0.0
   scale: 1.0
   task_id: calc_tilt_3layer
   unit: ℃
-- channel_name: 3层上模具下层中心差 ((CH2*2‑CH1‑CH3)*0.5)
+- channel_name: "3上下中心差 ((CH2*2‑CH1‑CH3)*0.5) | (task_temp_ch2*2-task_temp_ch1-task_temp_ch3)*0.5"
   channel_prefix: calc_3layer_center_diff
   formula: (task_temp_ch2*2-task_temp_ch1-task_temp_ch3)*0.5
   offset: 0.0
   scale: 1.0
   task_id: calc_center_3layer
   unit: ℃
-- channel_name: 3层上模具下层PWM调节值
+- channel_name: "3上下PWM调节值 | min(max((heater_duty_mid_upper_mid-(task_temp_ch2*2-task_temp_ch1-task_temp_ch3)*0.5),0),100)"
   channel_prefix: calc_3layer_pwm
-  formula: min(max((heater_duty_lower_mid-(task_temp_ch2*2-task_temp_ch1-task_temp_ch3)*0.5),0),100)
+  formula: min(max((heater_duty_mid_upper_mid-(task_temp_ch2*2-task_temp_ch1-task_temp_ch3)*0.5),0),100)
   offset: 0.0
   scale: 1.0
   task_id: calc_pwm_3layer
   unit: '%'
-
-# ========== 4层 上模具上层 PT100 CH4 CH5 CH6  SV:CH7 CH8 ==========
-- channel_name: 4层上模具上层SV实时CH7
+# ========== 4 上上 PT100 CH4 CH5 CH6  SV:CH7 CH8 ==========
+# 【已修正：sv7/sv8接反对调】calc_live_ch7 使用 task_sv_ch8；calc_live_ch8 使用 task_sv_ch7
+- channel_name: "4上上SVCH7 | min(max(task_sv_ch8*10+(175-task_temp_ch4)*10,1500),2500)"
   channel_prefix: calc_live_ch7
-  formula: min(max(task_sv_ch7*10+(175-task_temp_ch4)*10,1500),2500)
+  formula: min(max(task_sv_ch8*10+(175-task_temp_ch4)*10,1500),2500)
   offset: 0.0
   scale: 1.0
   task_id: calc_live_ch7_1785919067213
   unit: ℃
-- channel_name: 4层上模具上层SV实时CH8
+- channel_name: "4上上SVCH8 | min(max(task_sv_ch7*10+(task_temp_ch4-task_temp_ch6)*10,1500),2500)"
   channel_prefix: calc_live_ch8
-  formula: min(max(task_sv_ch8*10+(task_temp_ch4-task_temp_ch6)*10,1500),2500)
+  formula: min(max(task_sv_ch7*10+(task_temp_ch4-task_temp_ch6)*10,1500),2500)
   offset: 0.0
   scale: 1.0
   task_id: calc_live_ch8_1785919067214
   unit: ℃
-- channel_name: 4层上模具上层SV‑实际温度差CH7
+- channel_name: "4上上SV‑实际温度差CH7 | task_sv_ch7-task_temp_ch4"
   channel_prefix: calc_live_ch7_diff
   formula: task_sv_ch7-task_temp_ch4
   offset: 0.0
   scale: 1.0
   task_id: calc_diff_4layer_01
   unit: ℃
-- channel_name: 4层上模具上层倾斜(CH4‑CH6)
+- channel_name: "4上上倾斜(CH4‑CH6) | task_temp_ch4-task_temp_ch6"
   channel_prefix: calc_4layer_tilt
   formula: task_temp_ch4-task_temp_ch6
   offset: 0.0
   scale: 1.0
   task_id: calc_tilt_4layer
   unit: ℃
-- channel_name: 4层上模具上层中心差 ((CH5*2‑CH4‑CH6)*0.5)
+- channel_name: "4上上中心差 ((CH5*2‑CH4‑CH6)*0.5) | (task_temp_ch5*2-task_temp_ch4-task_temp_ch6)*0.5"
   channel_prefix: calc_4layer_center_diff
   formula: (task_temp_ch5*2-task_temp_ch4-task_temp_ch6)*0.5
   offset: 0.0
   scale: 1.0
   task_id: calc_center_4layer
   unit: ℃
-- channel_name: 4层上模具上层PWM调节值
+- channel_name: "4上上PWM调节值 | min(max((heater_duty_upper_mid-(task_temp_ch5*2-task_temp_ch4-task_temp_ch6)*0.5),0),100)"
   channel_prefix: calc_4layer_pwm
-  formula: min(max((heater_duty_mid_lower_mid-(task_temp_ch5*2-task_temp_ch4-task_temp_ch6)*0.5),0),100)
+  formula: min(max((heater_duty_upper_mid-(task_temp_ch5*2-task_temp_ch4-task_temp_ch6)*0.5),0),100)
   offset: 0.0
   scale: 1.0
   task_id: calc_pwm_4layer
   unit: '%'
-
 calc_write_tasks:
-# 3层上模具下层 CH5 CH6 寄存器4108、4109
+# 3上下 CH5 CH6 寄存器4108、4109
 - byte_order: abcd
   connection_id: dte_rtu_com9
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
-  name: 设置3层上模具下层CH5设定温度SV
+  name: 3上下CH5SV
   source_task_id: calc_live_ch5_1785919067211
   start_addr: 4108
   task_id: calc_write_sv_ch5_1785919993456
@@ -104,20 +103,19 @@ calc_write_tasks:
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
-  name: 设置3层上模具下层CH6设定温度SV
+  name: 3上下CH6SV
   source_task_id: calc_live_ch6_1785919067212
   start_addr: 4109
   task_id: calc_write_sv_ch6_1785919993457
   write_interval: 1500.0
-
-# 4层上模具上层 CH7 CH8 寄存器4110、4111
+# 4上上 CH7 CH8 寄存器4110、4111【已修正source_task_id对调】
 - byte_order: abcd
   connection_id: dte_rtu_com9
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
-  name: 设置4层上模具上层CH7设定温度SV
-  source_task_id: calc_live_ch7_1785919067213
+  name: 4上上CH7SV
+  source_task_id: calc_live_ch8_1785919067214
   start_addr: 4110
   task_id: calc_write_sv_ch7_1785919993458
   write_interval: 1500.0
@@ -126,21 +124,20 @@ calc_write_tasks:
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
-  name: 设置4层上模具上层CH8设定温度SV
-  source_task_id: calc_live_ch8_1785919067214
+  name: 4上上CH8SV
+  source_task_id: calc_live_ch7_1785919067213
   start_addr: 4111
   task_id: calc_write_sv_ch8_1785919993459
   write_interval: 1500.0
-
 # PWM输出到基恩士PLC
 - byte_order: abcd
   connection_id: pwm_plc1
   connection_type: keyence
   data_type: uint16
   device_type: DM
-  name: 3层上模具下层PWM调节值
+  name: 3上下PWM调节值
   source_task_id: calc_pwm_3layer
-  start_addr: 15100
+  start_addr: 15104
   task_id: pwm_3layer
   write_interval: 1500.0
 - byte_order: abcd
@@ -148,12 +145,11 @@ calc_write_tasks:
   connection_type: keyence
   data_type: uint16
   device_type: DM
-  name: 4层上模具上层PWM调节值
+  name: 4上上PWM调节值
   source_task_id: calc_pwm_4layer
-  start_addr: 15102
+  start_addr: 15106
   task_id: pwm_4layer
   write_interval: 1500.0
-
 connections:
   dte_rtu_com9:
     params:
@@ -182,13 +178,11 @@ connections:
       timeout: 3.0
       unit: 0
     type: keyence
-
 poll_interval: 10.0
-
 tasks:
 # PT100 1‑6路
 - byte_order: abcd
-  channel_name: 第1路温度（3层上模具下层‑CH1）
+  channel_name: 第1路温度（3上下‑CH1）
   channel_prefix: temp_ch1
   connection_id: pt100_rtu_com11
   connection_type: modbus_rtu
@@ -201,7 +195,7 @@ tasks:
   task_id: task_temp_ch1
   unit: °C
 - byte_order: abcd
-  channel_name: 第2路温度（3层上模具下层‑CH2）
+  channel_name: 第2路温度（3上下‑CH2）
   channel_prefix: temp_ch2
   connection_id: pt100_rtu_com11
   connection_type: modbus_rtu
@@ -214,7 +208,7 @@ tasks:
   task_id: task_temp_ch2
   unit: °C
 - byte_order: abcd
-  channel_name: 第3路温度（3层上模具下层‑CH3）
+  channel_name: 第3路温度（3上下‑CH3）
   channel_prefix: temp_ch3
   connection_id: pt100_rtu_com11
   connection_type: modbus_rtu
@@ -227,7 +221,7 @@ tasks:
   task_id: task_temp_ch3
   unit: °C
 - byte_order: abcd
-  channel_name: 第4路温度（4层上模具上层‑CH4）
+  channel_name: 第4路温度（4上上‑CH4）
   channel_prefix: temp_ch4
   connection_id: pt100_rtu_com11
   connection_type: modbus_rtu
@@ -240,7 +234,7 @@ tasks:
   task_id: task_temp_ch4
   unit: °C
 - byte_order: abcd
-  channel_name: 第5路温度（4层上模具上层‑CH5）
+  channel_name: 第5路温度（4上上‑CH5）
   channel_prefix: temp_ch5
   connection_id: pt100_rtu_com11
   connection_type: modbus_rtu
@@ -253,7 +247,7 @@ tasks:
   task_id: task_temp_ch5
   unit: °C
 - byte_order: abcd
-  channel_name: 第6路温度（4层上模具上层‑CH6）
+  channel_name: 第6路温度（4上上‑CH6）
   channel_prefix: temp_ch6
   connection_id: pt100_rtu_com11
   connection_type: modbus_rtu
@@ -265,10 +259,9 @@ tasks:
   start_addr: 5
   task_id: task_temp_ch6
   unit: °C
-
-# SV设定读取 CH1‑CH8
+# SV设定读取 CH1‑CH8 【已修正：sv_ch7、sv_ch8 start_addr地址互换】
 - byte_order: abcd
-  channel_name: CH1设定温度（下模下层）
+  channel_name: CH1（下模下）
   channel_prefix: sv_ch1
   connection_id: dte_rtu_com9
   connection_type: modbus_rtu
@@ -281,7 +274,7 @@ tasks:
   task_id: task_sv_ch1
   unit: °C
 - byte_order: abcd
-  channel_name: CH2设定温度（下模下层）
+  channel_name: CH2（下模下）
   channel_prefix: sv_ch2
   connection_id: dte_rtu_com9
   connection_type: modbus_rtu
@@ -294,7 +287,7 @@ tasks:
   task_id: task_sv_ch2
   unit: °C
 - byte_order: abcd
-  channel_name: CH3设定温度（下模上层）
+  channel_name: CH3（下模上）
   channel_prefix: sv_ch3
   connection_id: dte_rtu_com9
   connection_type: modbus_rtu
@@ -307,7 +300,7 @@ tasks:
   task_id: task_sv_ch3
   unit: °C
 - byte_order: abcd
-  channel_name: CH4设定温度（下模上层）
+  channel_name: CH4（下模上）
   channel_prefix: sv_ch4
   connection_id: dte_rtu_com9
   connection_type: modbus_rtu
@@ -320,7 +313,7 @@ tasks:
   task_id: task_sv_ch4
   unit: °C
 - byte_order: abcd
-  channel_name: CH5设定温度（3层‑上模具下层）
+  channel_name: CH5（3‑上下）
   channel_prefix: sv_ch5
   connection_id: dte_rtu_com9
   connection_type: modbus_rtu
@@ -333,7 +326,7 @@ tasks:
   task_id: task_sv_ch5
   unit: °C
 - byte_order: abcd
-  channel_name: CH6设定温度（3层‑上模具下层）
+  channel_name: CH6（3‑上下）
   channel_prefix: sv_ch6
   connection_id: dte_rtu_com9
   connection_type: modbus_rtu
@@ -345,8 +338,9 @@ tasks:
   start_addr: 4109
   task_id: task_sv_ch6
   unit: °C
+# 原sv_ch7 start_addr:4110；sv_ch8 start_addr:4111 → 互换
 - byte_order: abcd
-  channel_name: CH7设定温度（4层‑上模具上层）
+  channel_name: CH7（4‑上上）
   channel_prefix: sv_ch7
   connection_id: dte_rtu_com9
   connection_type: modbus_rtu
@@ -355,11 +349,11 @@ tasks:
   offset: 0
   quantity: 1
   scale: 0.1
-  start_addr: 4110
+  start_addr: 4111
   task_id: task_sv_ch7
   unit: °C
 - byte_order: abcd
-  channel_name: CH8设定温度（4层‑上模具上层）
+  channel_name: CH8（4‑上上）
   channel_prefix: sv_ch8
   connection_id: dte_rtu_com9
   connection_type: modbus_rtu
@@ -368,13 +362,12 @@ tasks:
   offset: 0
   quantity: 1
   scale: 0.1
-  start_addr: 4111
+  start_addr: 4110
   task_id: task_sv_ch8
   unit: °C
-
 # 基恩士PLC PWM占空比读取
 - byte_order: abcd
-  channel_name: 3层中间加热棒占空比DM15100
+  channel_name: 3中间加热棒占空比DM15100
   channel_prefix: lower_mid_heater
   connection_id: pwm_plc1
   connection_type: keyence
@@ -387,7 +380,7 @@ tasks:
   task_id: heater_duty_lower_mid
   unit: '%'
 - byte_order: abcd
-  channel_name: 4层中间加热棒占空比DM15102
+  channel_name: 4中间加热棒占空比DM15102
   channel_prefix: mid_lower_mid_heater
   connection_id: pwm_plc1
   connection_type: keyence
@@ -400,7 +393,7 @@ tasks:
   task_id: heater_duty_mid_lower_mid
   unit: '%'
 - byte_order: abcd
-  channel_name: 中层上面中间两个加热棒占空比DM15104
+  channel_name: 中上面中间两个加热棒占空比DM15104
   channel_prefix: mid_upper_mid_heater
   connection_id: pwm_plc1
   connection_type: keyence
@@ -413,7 +406,7 @@ tasks:
   task_id: heater_duty_mid_upper_mid
   unit: '%'
 - byte_order: abcd
-  channel_name: 下模上层中间两个加热棒占空比DM15106
+  channel_name: 下模上中间两个加热棒占空比DM15106
   channel_prefix: upper_mid_heater
   connection_id: pwm_plc1
   connection_type: keyence
@@ -425,7 +418,6 @@ tasks:
   start_addr: 15106
   task_id: heater_duty_upper_mid
   unit: '%'
-
 # CH1‑CH8输出功率读取
 - byte_order: abcd
   channel_name: CH1输出功率1
@@ -531,7 +523,6 @@ tasks:
   start_addr: 4215
   task_id: task_out1_ch8
   unit: '%'
-
 write_tasks:
 # ==========新增：CH1‑CH4固定SV下发，uint16寄存器值=温度*10 ==========
 - byte_order: abcd
@@ -539,27 +530,27 @@ write_tasks:
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
-  name: 固定写CH1 SV 184.4℃
+  name: CH1 SV 184.4℃
   start_addr: 4104
   task_id: wtask_fix_sv_ch1
-  value: 1844.0
+  value: 1644.0
   write_interval: 1500.0
 - byte_order: abcd
   connection_id: dte_rtu_com9
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
-  name: 固定写CH2 SV 187.5℃
+  name: CH2 SV 187.5℃
   start_addr: 4105
   task_id: wtask_fix_sv_ch2
-  value: 1875.0
+  value: 1675.0
   write_interval: 1500.0
 - byte_order: abcd
   connection_id: dte_rtu_com9
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
-  name: 固定写CH3 SV 169.3℃
+  name: CH3 SV 169.3℃
   start_addr: 4106
   task_id: wtask_fix_sv_ch3
   value: 1693.0
@@ -569,19 +560,18 @@ write_tasks:
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
-  name: 固定写CH4 SV 173.2℃
+  name: CH4 SV 173.2℃
   start_addr: 4107
   task_id: wtask_fix_sv_ch4
-  value: 1732.0
+  value: 1632.0
   write_interval: 1500.0
-
-# PID模式写任务
+# PID模式任务
 - byte_order: abcd
   connection_id: dte_rtu_com9
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
-  name: 写入CH1的PID模式
+  name: CH1的PID模式
   start_addr: 4280
   task_id: wtask_mode_ch1
   value: 0.0
@@ -591,7 +581,7 @@ write_tasks:
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
-  name: 写入CH2的PID模式
+  name: CH2的PID模式
   start_addr: 4281
   task_id: wtask_mode_ch2
   value: 0.0
@@ -601,7 +591,7 @@ write_tasks:
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
-  name: 写入CH3的PID模式
+  name: CH3的PID模式
   start_addr: 4282
   task_id: wtask_mode_ch3
   value: 0.0
@@ -611,7 +601,7 @@ write_tasks:
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
-  name: 写入CH4的PID模式
+  name: CH4的PID模式
   start_addr: 4283
   task_id: wtask_mode_ch4
   value: 0.0
@@ -621,7 +611,7 @@ write_tasks:
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
-  name: 写入CH5的PID模式
+  name: CH5的PID模式
   start_addr: 4284
   task_id: wtask_mode_ch5
   value: 0.0
@@ -631,7 +621,7 @@ write_tasks:
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
-  name: 写入CH6的PID模式
+  name: CH6的PID模式
   start_addr: 4285
   task_id: wtask_mode_ch6
   value: 0.0
@@ -641,7 +631,7 @@ write_tasks:
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
-  name: 写入CH7的PID模式
+  name: CH7的PID模式
   start_addr: 4286
   task_id: wtask_mode_ch7
   value: 0.0
@@ -651,7 +641,7 @@ write_tasks:
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
-  name: 写入CH8的PID模式
+  name: CH8的PID模式
   start_addr: 4287
   task_id: wtask_mode_ch8
   value: 0.0
