@@ -1,139 +1,321 @@
+calc_tasks:
+# ========== 3 上下 PT100 CH1 CH2 CH3  SV:CH5 CH6 ==========
+- channel_name: "L3_SVCH5 | min(max(sv5*10+(175-t1)*10,1500),2500)"
+  channel_prefix: calc_live_ch5
+  formula: min(max(sv5*10+(175-t1)*10,1500),2500)
+  offset: 0.0
+  scale: 1.0
+  task_id: calc_live_ch5_1785919067211
+  unit: ℃
+- channel_name: "L3_SVCH6 | min(max(sv6*10+(t1-t3)*10,1500),2500)"
+  channel_prefix: calc_live_ch6
+  formula: min(max(sv6*10+(t1-t3)*10,1500),2500)
+  offset: 0.0
+  scale: 1.0
+  task_id: calc_live_ch6_1785919067212
+  unit: ℃
+- channel_name: "L3_SV‑实际温度差CH5 | sv5-t1"
+  channel_prefix: calc_live_ch5_diff
+  formula: sv5-t1
+  offset: 0.0
+  scale: 1.0
+  task_id: calc_diff_3layer_01
+  unit: ℃
+- channel_name: "L3倾斜(CH1‑CH3) | t1-t3"
+  channel_prefix: calc_3layer_tilt
+  formula: t1-t3
+  offset: 0.0
+  scale: 1.0
+  task_id: calc_tilt_3layer
+  unit: ℃
+- channel_name: "L3中心差 ((CH2*2‑CH1‑CH3)*0.5) | (t2*2-t1-t3)*0.5"
+  channel_prefix: calc_3layer_center_diff
+  formula: (t2*2-t1-t3)*0.5
+  offset: 0.0
+  scale: 1.0
+  task_id: calc_center_3layer
+  unit: ℃
+- channel_name: "L3PWM | min(max((L3PWM-(t2*2-t1-t3)*0.5),0),100)"
+  channel_prefix: calc_3layer_pwm
+  formula: min(max((L3PWM-(t2*2-t1-t3)*0.5),0),100)
+  offset: 0.0
+  scale: 1.0
+  task_id: calc_pwm_3layer
+  unit: '%'
+# ========== 4 上上 PT100 CH4 CH5 CH6  SV:CH7 CH8 ==========
+# 【已修正：sv7/sv8接反对调】calc_live_ch7 使用 sv8；calc_live_ch8 使用 sv7
+- channel_name: "L4_SV7 | min(max(sv8*10+(175-t4)*10,1500),2500)"
+  channel_prefix: calc_live_ch7
+  formula: min(max(sv8*10+(175-t4)*10,1500),2500)
+  offset: 0.0
+  scale: 1.0
+  task_id: calc_live_ch7_1785919067213
+  unit: ℃
+- channel_name: "L4_SV8 | min(max(sv7*10+(t4-t6)*10,1500),2500)"
+  channel_prefix: calc_live_ch8
+  formula: min(max(sv7*10+(t4-t6)*10,1500),2500)
+  offset: 0.0
+  scale: 1.0
+  task_id: calc_live_ch8_1785919067214
+  unit: ℃
+- channel_name: "L4_SV‑实际温度差CH7 | sv7-t4"
+  channel_prefix: calc_live_ch7_diff
+  formula: sv7-t4
+  offset: 0.0
+  scale: 1.0
+  task_id: calc_diff_4layer_01
+  unit: ℃
+- channel_name: "L4倾斜(CH4‑CH6) | t4-t6"
+  channel_prefix: calc_4layer_tilt
+  formula: t4-t6
+  offset: 0.0
+  scale: 1.0
+  task_id: calc_tilt_4layer
+  unit: ℃
+- channel_name: "L4中心差 ((CH5*2‑CH4‑CH6)*0.5) | (t5*2-t4-t6)*0.5"
+  channel_prefix: calc_4layer_center_diff
+  formula: (t5*2-t4-t6)*0.5
+  offset: 0.0
+  scale: 1.0
+  task_id: calc_center_4layer
+  unit: ℃
+- channel_name: "L4_PWM | min(max((L4_PWM-(t5*2-t4-t6)*0.5),0),100)"
+  channel_prefix: calc_4layer_pwm
+  formula: min(max((L4_PWM-(t5*2-t4-t6)*0.5),0),100)
+  offset: 0.0
+  scale: 1.0
+  task_id: calc_pwm_4layer
+  unit: '%'
+calc_write_tasks:
+# L3 CH5 CH6 寄存器4108、4109
+- byte_order: abcd
+  connection_id: dte_rtu_com9
+  connection_type: modbus_rtu
+  data_type: uint16
+  device_type: holding
+  name: L3CH5SV
+  source_task_id: calc_live_ch5_1785919067211
+  start_addr: 4108
+  task_id: calc_write_sv_ch5_1785919993456
+  write_interval: 1500.0
+- byte_order: abcd
+  connection_id: dte_rtu_com9
+  connection_type: modbus_rtu
+  data_type: uint16
+  device_type: holding
+  name: L3CH6SV
+  source_task_id: calc_live_ch6_1785919067212
+  start_addr: 4109
+  task_id: calc_write_sv_ch6_1785919993457
+  write_interval: 1500.0
+# L4 CH7 CH8 寄存器4110、4111【已修正source_task_id对调】
+- byte_order: abcd
+  connection_id: dte_rtu_com9
+  connection_type: modbus_rtu
+  data_type: uint16
+  device_type: holding
+  name: L4CH7SV
+  source_task_id: calc_live_ch8_1785919067214
+  start_addr: 4110
+  task_id: calc_write_sv_ch7_1785919993458
+  write_interval: 1500.0
+- byte_order: abcd
+  connection_id: dte_rtu_com9
+  connection_type: modbus_rtu
+  data_type: uint16
+  device_type: holding
+  name: L4CH8SV
+  source_task_id: calc_live_ch7_1785919067213
+  start_addr: 4111
+  task_id: calc_write_sv_ch8_1785919993459
+  write_interval: 1500.0
+# PWM输出到基恩士PLC
+- byte_order: abcd
+  connection_id: pwm_plc1
+  connection_type: keyence
+  data_type: uint16
+  device_type: DM
+  name: L3PWM
+  source_task_id: calc_pwm_3layer
+  start_addr: 15104
+  task_id: pwm_3layer
+  write_interval: 1500.0
+- byte_order: abcd
+  connection_id: pwm_plc1
+  connection_type: keyence
+  data_type: uint16
+  device_type: DM
+  name: L4_PWM
+  source_task_id: calc_pwm_4layer
+  start_addr: 15106
+  task_id: pwm_4layer
+  write_interval: 1500.0
 connections:
-  delta_dte10t:
+  dte_rtu_com9:
     params:
       baudrate: 115200
       bytesize: 8
       parity: E
-      port: COM8
-      slave_id: 1
-      stopbits: 1
-    type: modbus_rtu
-  delta_tc_rtu:
-    params:
-      baudrate: 38400
-      bytesize: 7
-      parity: E
-      port: COM23
+      port: COM9
       slave_id: 1
       stopbits: 1
       timeout: 1.0
-    type: modbus_ascii
-  keyence_plc1:
+    type: modbus_rtu
+  pt100_rtu_com11:
     params:
-      host: 192.168.2.40
+      baudrate: 9600
+      bytesize: 8
+      parity: N
+      port: COM11
+      slave_id: 0
+      stopbits: 1
+      timeout: 1.0
+    type: modbus_rtu
+  pwm_plc1:
+    params:
+      host: 192.168.2.80
       port: 8501
+      timeout: 3.0
       unit: 0
     type: keyence
-poll_interval: 1.0
+poll_interval: 10.0
 tasks:
+# PT100 1‑6路
 - byte_order: abcd
-  channel_name: DTE_CH5当前温度
-  channel_prefix: pv_ch5
-  connection_id: delta_dte10t
+  channel_name: 第1路温度（L3‑CH1）
+  channel_prefix: temp_ch1
+  connection_id: pt100_rtu_com11
+  connection_type: modbus_rtu
+  data_type: uint16
+  device_type: holding
+  offset: 0
+  quantity: 1
+  scale: 0.01
+  start_addr: 0
+  task_id: t1
+  unit: °C
+- byte_order: abcd
+  channel_name: 第2路温度（L3‑CH2）
+  channel_prefix: temp_ch2
+  connection_id: pt100_rtu_com11
+  connection_type: modbus_rtu
+  data_type: uint16
+  device_type: holding
+  offset: 0
+  quantity: 1
+  scale: 0.01
+  start_addr: 1
+  task_id: t2
+  unit: °C
+- byte_order: abcd
+  channel_name: 第3路温度（L3‑CH3）
+  channel_prefix: temp_ch3
+  connection_id: pt100_rtu_com11
+  connection_type: modbus_rtu
+  data_type: uint16
+  device_type: holding
+  offset: 0
+  quantity: 1
+  scale: 0.01
+  start_addr: 2
+  task_id: t3
+  unit: °C
+- byte_order: abcd
+  channel_name: 第4路温度（L4‑CH4）
+  channel_prefix: temp_ch4
+  connection_id: pt100_rtu_com11
+  connection_type: modbus_rtu
+  data_type: uint16
+  device_type: holding
+  offset: 0
+  quantity: 1
+  scale: 0.01
+  start_addr: 3
+  task_id: t4
+  unit: °C
+- byte_order: abcd
+  channel_name: 第5路温度（L4‑CH5）
+  channel_prefix: temp_ch5
+  connection_id: pt100_rtu_com11
+  connection_type: modbus_rtu
+  data_type: uint16
+  device_type: holding
+  offset: 0
+  quantity: 1
+  scale: 0.01
+  start_addr: 4
+  task_id: t5
+  unit: °C
+- byte_order: abcd
+  channel_name: 第6路温度（L4‑CH6）
+  channel_prefix: temp_ch6
+  connection_id: pt100_rtu_com11
+  connection_type: modbus_rtu
+  data_type: uint16
+  device_type: holding
+  offset: 0
+  quantity: 1
+  scale: 0.01
+  start_addr: 5
+  task_id: t6
+  unit: °C
+# SV设定读取 CH1‑CH8 【已修正：sv_ch7、sv_ch8 start_addr地址互换】
+- byte_order: abcd
+  channel_name: L1_SV1
+  channel_prefix: sv_ch1
+  connection_id: dte_rtu_com9
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
   offset: 0
   quantity: 1
   scale: 0.1
-  start_addr: 4100
-  task_id: task_dte_pv_ch5
+  start_addr: 4104
+  task_id: sv1
   unit: °C
 - byte_order: abcd
-  channel_name: DTE_CH6当前温度
-  channel_prefix: pv_ch6
-  connection_id: delta_dte10t
+  channel_name: L1_SV2
+  channel_prefix: sv_ch2
+  connection_id: dte_rtu_com9
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
   offset: 0
   quantity: 1
   scale: 0.1
-  start_addr: 4101
-  task_id: task_dte_pv_ch6
+  start_addr: 4105
+  task_id: sv2
   unit: °C
 - byte_order: abcd
-  channel_name: DTE_CH7当前温度
-  channel_prefix: pv_ch7
-  connection_id: delta_dte10t
+  channel_name: L2_SV3
+  channel_prefix: sv_ch3
+  connection_id: dte_rtu_com9
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
   offset: 0
   quantity: 1
   scale: 0.1
-  start_addr: 4102
-  task_id: task_dte_pv_ch7
+  start_addr: 4106
+  task_id: sv3
   unit: °C
 - byte_order: abcd
-  channel_name: DTE_CH8当前温度
-  channel_prefix: pv_ch8
-  connection_id: delta_dte10t
+  channel_name: L2_SV4
+  channel_prefix: sv_ch4
+  connection_id: dte_rtu_com9
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
   offset: 0
   quantity: 1
   scale: 0.1
-  start_addr: 4103
-  task_id: task_dte_pv_ch8
+  start_addr: 4107
+  task_id: sv4
   unit: °C
 - byte_order: abcd
-  channel_name: DTE_CH5当前温度
-  channel_prefix: pv_ch5
-  connection_id: delta_dte10t
-  connection_type: modbus_rtu
-  data_type: uint16
-  device_type: holding
-  offset: 0
-  quantity: 1
-  scale: 0.1
-  start_addr: 4100
-  task_id: task_dte_pv_ch5
-  unit: °C
-- byte_order: abcd
-  channel_name: DTE_CH6当前温度
-  channel_prefix: pv_ch6
-  connection_id: delta_dte10t
-  connection_type: modbus_rtu
-  data_type: uint16
-  device_type: holding
-  offset: 0
-  quantity: 1
-  scale: 0.1
-  start_addr: 4101
-  task_id: task_dte_pv_ch6
-  unit: °C
-- byte_order: abcd
-  channel_name: DTE_CH7当前温度
-  channel_prefix: pv_ch7
-  connection_id: delta_dte10t
-  connection_type: modbus_rtu
-  data_type: uint16
-  device_type: holding
-  offset: 0
-  quantity: 1
-  scale: 0.1
-  start_addr: 4102
-  task_id: task_dte_pv_ch7
-  unit: °C
-- byte_order: abcd
-  channel_name: DTE_CH8当前温度
-  channel_prefix: pv_ch8
-  connection_id: delta_dte10t
-  connection_type: modbus_rtu
-  data_type: uint16
-  device_type: holding
-  offset: 0
-  quantity: 1
-  scale: 0.1
-  start_addr: 4103
-  task_id: task_dte_pv_ch8
-  unit: °C
-- byte_order: abcd
-  channel_name: DTE_CH5设定温度
+  channel_name: L3_SV5
   channel_prefix: sv_ch5
-  connection_id: delta_dte10t
+  connection_id: dte_rtu_com9
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
@@ -141,12 +323,12 @@ tasks:
   quantity: 1
   scale: 0.1
   start_addr: 4108
-  task_id: task_dte_sv_ch5
+  task_id: sv5
   unit: °C
 - byte_order: abcd
-  channel_name: DTE_CH6设定温度
+  channel_name: L3_SV6
   channel_prefix: sv_ch6
-  connection_id: delta_dte10t
+  connection_id: dte_rtu_com9
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
@@ -154,25 +336,13 @@ tasks:
   quantity: 1
   scale: 0.1
   start_addr: 4109
-  task_id: task_dte_sv_ch6
+  task_id: sv6
   unit: °C
+# 原sv_ch7 start_addr:4110；sv_ch8 start_addr:4111 → 互换
 - byte_order: abcd
-  channel_name: DTE_CH7设定温度
+  channel_name: L4_SV7
   channel_prefix: sv_ch7
-  connection_id: delta_dte10t
-  connection_type: modbus_rtu
-  data_type: uint16
-  device_type: holding
-  offset: 0
-  quantity: 1
-  scale: 0.1
-  start_addr: 4110
-  task_id: task_dte_sv_ch7
-  unit: °C
-- byte_order: abcd
-  channel_name: DTE_CH8设定温度
-  channel_prefix: sv_ch8
-  connection_id: delta_dte10t
+  connection_id: dte_rtu_com9
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
@@ -180,12 +350,131 @@ tasks:
   quantity: 1
   scale: 0.1
   start_addr: 4111
-  task_id: task_dte_sv_ch8
+  task_id: sv7
   unit: °C
 - byte_order: abcd
-  channel_name: DTE_CH5输出功率1
+  channel_name: L4_SV8
+  channel_prefix: sv_ch8
+  connection_id: dte_rtu_com9
+  connection_type: modbus_rtu
+  data_type: uint16
+  device_type: holding
+  offset: 0
+  quantity: 1
+  scale: 0.1
+  start_addr: 4110
+  task_id: sv8
+  unit: °C
+# 基恩士PLC PWM占空比读取
+- byte_order: abcd
+  channel_name: L3_PWM_DM15100
+  channel_prefix: lower_mid_heater
+  connection_id: pwm_plc1
+  connection_type: keyence
+  data_type: uint16
+  device_type: DM
+  offset: 0
+  quantity: 1
+  scale: 1.0
+  start_addr: 15100
+  task_id: L1PWM
+  unit: '%'
+- byte_order: abcd
+  channel_name: L4_PWM_DM15102
+  channel_prefix: mid_lower_mid_heater
+  connection_id: pwm_plc1
+  connection_type: keyence
+  data_type: uint16
+  device_type: DM
+  offset: 0
+  quantity: 1
+  scale: 1.0
+  start_addr: 15102
+  task_id: L2PWM
+  unit: '%'
+- byte_order: abcd
+  channel_name: L3_PWM_DM15104
+  channel_prefix: mid_upper_mid_heater
+  connection_id: pwm_plc1
+  connection_type: keyence
+  data_type: uint16
+  device_type: DM
+  offset: 0
+  quantity: 1
+  scale: 1.0
+  start_addr: 15104
+  task_id: L3PWM
+  unit: '%'
+- byte_order: abcd
+  channel_name: L4_PWM_DM15106
+  channel_prefix: upper_mid_heater
+  connection_id: pwm_plc1
+  connection_type: keyence
+  data_type: uint16
+  device_type: DM
+  offset: 0
+  quantity: 1
+  scale: 1.0
+  start_addr: 15106
+  task_id: L4_PWM
+  unit: '%'
+# CH1‑CH8输出功率读取
+- byte_order: abcd
+  channel_name: CH1输出功率1
+  channel_prefix: out1_ch1
+  connection_id: dte_rtu_com9
+  connection_type: modbus_rtu
+  data_type: uint16
+  device_type: holding
+  offset: 0
+  quantity: 1
+  scale: 0.1
+  start_addr: 4208
+  task_id: task_out1_ch1
+  unit: '%'
+- byte_order: abcd
+  channel_name: CH2输出功率1
+  channel_prefix: out1_ch2
+  connection_id: dte_rtu_com9
+  connection_type: modbus_rtu
+  data_type: uint16
+  device_type: holding
+  offset: 0
+  quantity: 1
+  scale: 0.1
+  start_addr: 4209
+  task_id: task_out1_ch2
+  unit: '%'
+- byte_order: abcd
+  channel_name: CH3输出功率1
+  channel_prefix: out1_ch3
+  connection_id: dte_rtu_com9
+  connection_type: modbus_rtu
+  data_type: uint16
+  device_type: holding
+  offset: 0
+  quantity: 1
+  scale: 0.1
+  start_addr: 4210
+  task_id: task_out1_ch3
+  unit: '%'
+- byte_order: abcd
+  channel_name: CH4输出功率1
+  channel_prefix: out1_ch4
+  connection_id: dte_rtu_com9
+  connection_type: modbus_rtu
+  data_type: uint16
+  device_type: holding
+  offset: 0
+  quantity: 1
+  scale: 0.1
+  start_addr: 4211
+  task_id: task_out1_ch4
+  unit: '%'
+- byte_order: abcd
+  channel_name: CH5输出功率1
   channel_prefix: out1_ch5
-  connection_id: delta_dte10t
+  connection_id: dte_rtu_com9
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
@@ -193,12 +482,12 @@ tasks:
   quantity: 1
   scale: 0.1
   start_addr: 4212
-  task_id: task_dte_out1_ch5
+  task_id: task_out1_ch5
   unit: '%'
 - byte_order: abcd
-  channel_name: DTE_CH6输出功率1
+  channel_name: CH6输出功率1
   channel_prefix: out1_ch6
-  connection_id: delta_dte10t
+  connection_id: dte_rtu_com9
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
@@ -206,12 +495,12 @@ tasks:
   quantity: 1
   scale: 0.1
   start_addr: 4213
-  task_id: task_dte_out1_ch6
+  task_id: task_out1_ch6
   unit: '%'
 - byte_order: abcd
-  channel_name: DTE_CH7输出功率1
+  channel_name: CH7输出功率1
   channel_prefix: out1_ch7
-  connection_id: delta_dte10t
+  connection_id: dte_rtu_com9
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
@@ -219,12 +508,12 @@ tasks:
   quantity: 1
   scale: 0.1
   start_addr: 4214
-  task_id: task_dte_out1_ch7
+  task_id: task_out1_ch7
   unit: '%'
 - byte_order: abcd
-  channel_name: DTE_CH8输出功率1
+  channel_name: CH8输出功率1
   channel_prefix: out1_ch8
-  connection_id: delta_dte10t
+  connection_id: dte_rtu_com9
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
@@ -232,306 +521,128 @@ tasks:
   quantity: 1
   scale: 0.1
   start_addr: 4215
-  task_id: task_dte_out1_ch8
+  task_id: task_out1_ch8
   unit: '%'
+write_tasks:
+# ==========新增：CH1‑CH4固定SV下发，uint16寄存器值=温度*10 ==========
 - byte_order: abcd
-  channel_name: DTE_CH5输出功率2
-  channel_prefix: out2_ch5
-  connection_id: delta_dte10t
+  connection_id: dte_rtu_com9
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
-  offset: 0
-  quantity: 1
-  scale: 0.1
-  start_addr: 4220
-  task_id: task_dte_out2_ch5
-  unit: '%'
+  name: CH1 SV 184.4℃
+  start_addr: 4104
+  task_id: wtask_fix_sv_ch1
+  value: 1644.0
+  write_interval: 1500.0
 - byte_order: abcd
-  channel_name: DTE_CH6输出功率2
-  channel_prefix: out2_ch6
-  connection_id: delta_dte10t
+  connection_id: dte_rtu_com9
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
-  offset: 0
-  quantity: 1
-  scale: 0.1
-  start_addr: 4221
-  task_id: task_dte_out2_ch6
-  unit: '%'
+  name: CH2 SV 187.5℃
+  start_addr: 4105
+  task_id: wtask_fix_sv_ch2
+  value: 1675.0
+  write_interval: 1500.0
 - byte_order: abcd
-  channel_name: DTE_CH7输出功率2
-  channel_prefix: out2_ch7
-  connection_id: delta_dte10t
+  connection_id: dte_rtu_com9
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
-  offset: 0
-  quantity: 1
-  scale: 0.1
-  start_addr: 4222
-  task_id: task_dte_out2_ch7
-  unit: '%'
+  name: CH3 SV 169.3℃
+  start_addr: 4106
+  task_id: wtask_fix_sv_ch3
+  value: 1693.0
+  write_interval: 1500.0
 - byte_order: abcd
-  channel_name: DTE_CH8输出功率2
-  channel_prefix: out2_ch8
-  connection_id: delta_dte10t
+  connection_id: dte_rtu_com9
   connection_type: modbus_rtu
   data_type: uint16
   device_type: holding
-  offset: 0
-  quantity: 1
-  scale: 0.1
-  start_addr: 4223
-  task_id: task_dte_out2_ch8
-  unit: '%'
-
-
-# ===== 通道5 数据采集 =====
-- task_id: task_dtm_ch5_pv
-  connection_id: delta_tc_rtu
+  name: CH4 SV 173.2℃
+  start_addr: 4107
+  task_id: wtask_fix_sv_ch4
+  value: 1632.0
+  write_interval: 1500.0
+# PID模式任务
+- byte_order: abcd
+  connection_id: dte_rtu_com9
   connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 620          # H0x26C
-  quantity: 1
   data_type: uint16
-  byte_order: abcd
-  channel_prefix: ch5
-  channel_name: DTM_通道5 PV值
-  unit: °C
-  scale: 0.1
-  offset: 0
-
-- task_id: task_dtm_ch5_sv
-  connection_id: delta_tc_rtu
+  device_type: holding
+  name: CH1的PID模式
+  start_addr: 4280
+  task_id: wtask_mode_ch1
+  value: 0.0
+  write_interval: 1500.0
+- byte_order: abcd
+  connection_id: dte_rtu_com9
   connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 4            # H0x004
-  quantity: 1
   data_type: uint16
-  byte_order: abcd
-  channel_prefix: ch5
-  channel_name: DTM_通道5 SV值
-  unit: °C
-  scale: 0.1
-  offset: 0
-
-- task_id: task_dtm_ch5_out1
-  connection_id: delta_tc_rtu
+  device_type: holding
+  name: CH2的PID模式
+  start_addr: 4281
+  task_id: wtask_mode_ch2
+  value: 0.0
+  write_interval: 1500.0
+- byte_order: abcd
+  connection_id: dte_rtu_com9
   connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 636          # H0x27C
-  quantity: 1
   data_type: uint16
-  byte_order: abcd
-  channel_prefix: ch5
-  channel_name: DTM_通道5 输出1
-  unit: '%'
-  scale: 0.1
-  offset: 0
-
-- task_id: task_dtm_ch5_out2
-  connection_id: delta_tc_rtu
+  device_type: holding
+  name: CH3的PID模式
+  start_addr: 4282
+  task_id: wtask_mode_ch3
+  value: 0.0
+  write_interval: 1500.0
+- byte_order: abcd
+  connection_id: dte_rtu_com9
   connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 644          # H0x284
-  quantity: 1
   data_type: uint16
-  byte_order: abcd
-  channel_prefix: ch5
-  channel_name: DTM_通道5 输出2
-  unit: '%'
-  scale: 0.1
-  offset: 0
-
-# ===== 通道6 数据采集 =====
-- task_id: task_dtm_ch6_pv
-  connection_id: delta_tc_rtu
+  device_type: holding
+  name: CH4的PID模式
+  start_addr: 4283
+  task_id: wtask_mode_ch4
+  value: 0.0
+  write_interval: 1500.0
+- byte_order: abcd
+  connection_id: dte_rtu_com9
   connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 621          # H0x26D
-  quantity: 1
   data_type: uint16
-  byte_order: abcd
-  channel_prefix: ch6
-  channel_name: DTM_通道6 PV值
-  unit: °C
-  scale: 0.1
-  offset: 0
-
-- task_id: task_dtm_ch6_sv
-  connection_id: delta_tc_rtu
+  device_type: holding
+  name: CH5的PID模式
+  start_addr: 4284
+  task_id: wtask_mode_ch5
+  value: 0.0
+  write_interval: 1500.0
+- byte_order: abcd
+  connection_id: dte_rtu_com9
   connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 5            # H0x005
-  quantity: 1
   data_type: uint16
-  byte_order: abcd
-  channel_prefix: ch6
-  channel_name: DTM_通道6 SV值
-  unit: °C
-  scale: 0.1
-  offset: 0
-
-- task_id: task_dtm_ch6_out1
-  connection_id: delta_tc_rtu
+  device_type: holding
+  name: CH6的PID模式
+  start_addr: 4285
+  task_id: wtask_mode_ch6
+  value: 0.0
+  write_interval: 1500.0
+- byte_order: abcd
+  connection_id: dte_rtu_com9
   connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 637          # H0x27D
-  quantity: 1
   data_type: uint16
-  byte_order: abcd
-  channel_prefix: ch6
-  channel_name: DTM_通道6 输出1
-  unit: '%'
-  scale: 0.1
-  offset: 0
-
-- task_id: task_dtm_ch6_out2
-  connection_id: delta_tc_rtu
+  device_type: holding
+  name: CH7的PID模式
+  start_addr: 4286
+  task_id: wtask_mode_ch7
+  value: 0.0
+  write_interval: 1500.0
+- byte_order: abcd
+  connection_id: dte_rtu_com9
   connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 645          # H0x285
-  quantity: 1
   data_type: uint16
-  byte_order: abcd
-  channel_prefix: ch6
-  channel_name: DTM_通道6 输出2
-  unit: '%'
-  scale: 0.1
-  offset: 0
-
-# ===== 通道7 数据采集 =====
-- task_id: task_dtm_ch7_pv
-  connection_id: delta_tc_rtu
-  connection_type: modbus_rtu
   device_type: holding
-  start_addr: 622          # H0x26E
-  quantity: 1
-  data_type: uint16
-  byte_order: abcd
-  channel_prefix: ch7
-  channel_name: DTM_通道7 PV值
-  unit: °C
-  scale: 0.1
-  offset: 0
-
-- task_id: task_dtm_ch7_sv
-  connection_id: delta_tc_rtu
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 6            # H0x006
-  quantity: 1
-  data_type: uint16
-  byte_order: abcd
-  channel_prefix: ch7
-  channel_name: DTM_通道7 SV值
-  unit: °C
-  scale: 0.1
-  offset: 0
-
-- task_id: task_dtm_ch7_out1
-  connection_id: delta_tc_rtu
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 638          # H0x27E
-  quantity: 1
-  data_type: uint16
-  byte_order: abcd
-  channel_prefix: ch7
-  channel_name: DTM_通道7 输出1
-  unit: '%'
-  scale: 0.1
-  offset: 0
-
-- task_id: task_dtm_ch7_out2
-  connection_id: delta_tc_rtu
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 646          # H0x286
-  quantity: 1
-  data_type: uint16
-  byte_order: abcd
-  channel_prefix: ch7
-  channel_name: DTM_通道7 输出2
-  unit: '%'
-  scale: 0.1
-  offset: 0
-
-# ===== 通道8 数据采集 =====
-- task_id: task_dtm_ch8_pv
-  connection_id: delta_tc_rtu
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 623          # H0x26F
-  quantity: 1
-  data_type: uint16
-  byte_order: abcd
-  channel_prefix: ch8
-  channel_name: DTM_通道8 PV值
-  unit: °C
-  scale: 0.1
-  offset: 0
-
-- task_id: task_dtm_ch8_sv
-  connection_id: delta_tc_rtu
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 7            # H0x007
-  quantity: 1
-  data_type: uint16
-  byte_order: abcd
-  channel_prefix: ch8
-  channel_name: DTM_通道8 SV值
-  unit: °C
-  scale: 0.1
-  offset: 0
-
-- task_id: task_dtm_ch8_out1
-  connection_id: delta_tc_rtu
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 639          # H0x27F
-  quantity: 1
-  data_type: uint16
-  byte_order: abcd
-  channel_prefix: ch8
-  channel_name: DTM_通道8 输出1
-  unit: '%'
-  scale: 0.1
-  offset: 0
-
-- task_id: task_dtm_ch8_out2
-  connection_id: delta_tc_rtu
-  connection_type: modbus_rtu
-  device_type: holding
-  start_addr: 647          # H0x287
-  quantity: 1
-  data_type: uint16
-  byte_order: abcd
-  channel_prefix: ch8
-  channel_name: DTM_通道8 输出2
-  unit: '%'
-  scale: 0.1
-  offset: 0
-
-# ============================
-# 计算任务配置
-# ============================
-calc_tasks:
-- task_id: calc_diff_ch8_ch7
-  channel_prefix: calc_diff_ch8_ch7
-  channel_name: CH8与CH7功率差之半
-  formula: "(task_out2_ch8 - task_out2_ch7) / 2"
-  unit: '%'
-  scale: 1.0
-  offset: 0.0
-
-- task_id: calc_avg_ch5_ch8
-  channel_prefix: calc_avg_ch5_ch8
-  channel_name: CH5-CH8平均输出功率
-  formula: "(task_out2_ch5 + task_out2_ch6 + task_out2_ch7 + task_out2_ch8) / 4"
-  unit: '%'
-  scale: 1.0
-  offset: 0.0
+  name: CH8的PID模式
+  start_addr: 4287
+  task_id: wtask_mode_ch8
+  value: 0.0
+  write_interval: 1500.0

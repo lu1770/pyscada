@@ -1,0 +1,928 @@
+calc_tasks:
+  # ========== 1层 下模具下层 PT100: 左t1 中t2 右t3 | SV: 左sv1 右sv2 | PWM: DM15100 ==========
+  - channel_name: "L1_SV_CH1 | min(max(sv1*10+(175-t1)*10,1500),2500)"
+    channel_prefix: calc_live_ch1
+    formula: min(max(sv1*10+(175-t1)*10,1500),2500)
+    offset: 0.0
+    scale: 1.0
+    task_id: calc_live_ch1_1785919067201
+    unit: ℃
+  - channel_name: "L1_SV_CH2 | min(max(sv2*10+(t1-t3)*10,1500),2500)"
+    channel_prefix: calc_live_ch2
+    formula: min(max(sv2*10+(t1-t3)*10,1500),2500)
+    offset: 0.0
+    scale: 1.0
+    task_id: calc_live_ch2_1785919067202
+    unit: ℃
+  - channel_name: "L1_PWM | min(max((L1PWM-(t2*2-t1-t3)*0.5),0),100)"
+    channel_prefix: calc_pwm_1layer
+    formula: min(max((L1PWM-(t2*2-t1-t3)*0.5),0),100)
+    offset: 0.0
+    scale: 1.0
+    task_id: calc_pwm_1layer
+    unit: '%'
+  # 监控计算
+  - channel_name: "L1倾斜(CH1‑CH3) | t1-t3"
+    channel_prefix: calc_1layer_tilt
+    formula: t1-t3
+    offset: 0.0
+    scale: 1.0
+    task_id: calc_tilt_1layer
+    unit: ℃
+  - channel_name: "L1中心差 | (t2*2-t1-t3)*0.5"
+    channel_prefix: calc_1layer_center_diff
+    formula: (t2*2-t1-t3)*0.5
+    offset: 0.0
+    scale: 1.0
+    task_id: calc_center_1layer
+    unit: ℃
+
+  # ========== 2层 下模具上层 PT100: 左t4 中t5 右t6 | SV: 左sv3 右sv4 | PWM: DM15102 ==========
+  - channel_name: "L2_SV_CH3 | min(max(sv3*10+(175-t4)*10,1500),2500)"
+    channel_prefix: calc_live_ch3
+    formula: min(max(sv3*10+(175-t4)*10,1500),2500)
+    offset: 0.0
+    scale: 1.0
+    task_id: calc_live_ch3_1785919067203
+    unit: ℃
+  - channel_name: "L2_SV_CH4 | min(max(sv4*10+(t4-t6)*10,1500),2500)"
+    channel_prefix: calc_live_ch4
+    formula: min(max(sv4*10+(t4-t6)*10,1500),2500)
+    offset: 0.0
+    scale: 1.0
+    task_id: calc_live_ch4_1785919067204
+    unit: ℃
+  - channel_name: "L2_PWM | min(max((L2PWM-(t5*2-t4-t6)*0.5),0),100)"
+    channel_prefix: calc_pwm_2layer
+    formula: min(max((L2PWM-(t5*2-t4-t6)*0.5),0),100)
+    offset: 0.0
+    scale: 1.0
+    task_id: calc_pwm_2layer
+    unit: '%'
+  # 监控计算
+  - channel_name: "L2倾斜(CH4‑CH6) | t4-t6"
+    channel_prefix: calc_2layer_tilt
+    formula: t4-t6
+    offset: 0.0
+    scale: 1.0
+    task_id: calc_tilt_2layer
+    unit: ℃
+  - channel_name: "L2中心差 | (t5*2-t4-t6)*0.5"
+    channel_prefix: calc_2layer_center_diff
+    formula: (t5*2-t4-t6)*0.5
+    offset: 0.0
+    scale: 1.0
+    task_id: calc_center_2layer
+    unit: ℃
+
+  # ========== 3层 上模具下层 PT100: 左t7 中t8 右t9 | SV: 左sv5 右sv6 | PWM: DM15104 ==========
+  - channel_name: "L3_SV_CH5 | min(max(sv5*10+(175-t7)*10,1500),2500)"
+    channel_prefix: calc_live_ch5
+    formula: min(max(sv5*10+(175-t7)*10,1500),2500)
+    offset: 0.0
+    scale: 1.0
+    task_id: calc_live_ch5_1785919067211
+    unit: ℃
+  - channel_name: "L3_SV_CH6 | min(max(sv6*10+(t7-t9)*10,1500),2500)"
+    channel_prefix: calc_live_ch6
+    formula: min(max(sv6*10+(t7-t9)*10,1500),2500)
+    offset: 0.0
+    scale: 1.0
+    task_id: calc_live_ch6_1785919067212
+    unit: ℃
+  - channel_name: "L3_PWM | min(max((L3PWM-(t8*2-t7-t9)*0.5),0),100)"
+    channel_prefix: calc_pwm_3layer
+    formula: min(max((L3PWM-(t8*2-t7-t9)*0.5),0),100)
+    offset: 0.0
+    scale: 1.0
+    task_id: calc_pwm_3layer
+    unit: '%'
+  # 监控计算
+  - channel_name: "L3倾斜(CH7‑CH9) | t7-t9"
+    channel_prefix: calc_3layer_tilt
+    formula: t7-t9
+    offset: 0.0
+    scale: 1.0
+    task_id: calc_tilt_3layer
+    unit: ℃
+  - channel_name: "L3中心差 | (t8*2-t7-t9)*0.5"
+    channel_prefix: calc_3layer_center_diff
+    formula: (t8*2-t7-t9)*0.5
+    offset: 0.0
+    scale: 1.0
+    task_id: calc_center_3layer
+    unit: ℃
+
+  # ========== 4层 上模具上层 PT100: 左t10 中t11 右t12 | SV: 左sv7 右sv8 | PWM: DM15106 ==========
+  # 更正：4层左侧sv7，右侧sv8
+  - channel_name: "L4_SV_CH7(左) | min(max(sv7*10+(175-t10)*10,1500),2500)"
+    channel_prefix: calc_live_ch7
+    formula: min(max(sv7*10+(175-t10)*10,1500),2500)
+    offset: 0.0
+    scale: 1.0
+    task_id: calc_live_ch7_1785919067213
+    unit: ℃
+  - channel_name: "L4_SV_CH8(右) | min(max(sv8*10+(t10-t12)*10,1500),2500)"
+    channel_prefix: calc_live_ch8
+    formula: min(max(sv8*10+(t10-t12)*10,1500),2500)
+    offset: 0.0
+    scale: 1.0
+    task_id: calc_live_ch8_1785919067214
+    unit: ℃
+  - channel_name: "L4_PWM | min(max((L4_PWM-(t11*2-t10-t12)*0.5),0),100)"
+    channel_prefix: calc_pwm_4layer
+    formula: min(max((L4_PWM-(t11*2-t10-t12)*0.5),0),100)
+    offset: 0.0
+    scale: 1.0
+    task_id: calc_pwm_4layer
+    unit: '%'
+  # 监控计算
+  - channel_name: "L4倾斜(CH10‑CH12) | t10-t12"
+    channel_prefix: calc_4layer_tilt
+    formula: t10-t12
+    offset: 0.0
+    scale: 1.0
+    task_id: calc_tilt_4layer
+    unit: ℃
+  - channel_name: "L4中心差 | (t11*2-t10-t12)*0.5"
+    channel_prefix: calc_4layer_center_diff
+    formula: (t11*2-t10-t12)*0.5
+    offset: 0.0
+    scale: 1.0
+    task_id: calc_center_4layer
+    unit: ℃
+
+calc_write_tasks:
+  # L1 CH1 CH2 寄存器4104、4105
+  - byte_order: abcd
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    name: L1CH1SV
+    source_task_id: calc_live_ch1_1785919067201
+    start_addr: 4104
+    task_id: calc_write_sv_ch1_1785919993450
+    write_interval: 1500.0
+  - byte_order: abcd
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    name: L1CH2SV
+    source_task_id: calc_live_ch2_1785919067202
+    start_addr: 4105
+    task_id: calc_write_sv_ch2_1785919993451
+    write_interval: 1500.0
+  # L2 CH3 CH4 寄存器4106、4107
+  - byte_order: abcd
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    name: L2CH3SV
+    source_task_id: calc_live_ch3_1785919067203
+    start_addr: 4106
+    task_id: calc_write_sv_ch3_1785919993452
+    write_interval: 1500.0
+  - byte_order: abcd
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    name: L2CH4SV
+    source_task_id: calc_live_ch4_1785919067204
+    start_addr: 4107
+    task_id: calc_write_sv_ch4_1785919993453
+    write_interval: 1500.0
+  # L3 CH5 CH6 寄存器4108、4109
+  - byte_order: abcd
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    name: L3CH5SV
+    source_task_id: calc_live_ch5_1785919067211
+    start_addr: 4108
+    task_id: calc_write_sv_ch5_1785919993456
+    write_interval: 1500.0
+  - byte_order: abcd
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    name: L3CH6SV
+    source_task_id: calc_live_ch6_1785919067212
+    start_addr: 4109
+    task_id: calc_write_sv_ch6_1785919993457
+    write_interval: 1500.0
+  # L4 CH7 CH8 寄存器4110、4111
+  # 更正：sv7(左) -> 4111, sv8(右) -> 4110
+  - byte_order: abcd
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    name: L4CH7SV(左)
+    source_task_id: calc_live_ch7_1785919067213
+    start_addr: 4111
+    task_id: calc_write_sv_ch7_1785919993458
+    write_interval: 1500.0
+  - byte_order: abcd
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    name: L4CH8SV(右)
+    source_task_id: calc_live_ch8_1785919067214
+    start_addr: 4110
+    task_id: calc_write_sv_ch8_1785919993459
+    write_interval: 1500.0
+
+  # PWM输出到基恩士PLC
+  - byte_order: abcd
+    connection_id: pwm_plc1
+    connection_type: keyence
+    data_type: uint16
+    device_type: DM
+    name: L1PWM
+    source_task_id: calc_pwm_1layer
+    start_addr: 15100
+    task_id: pwm_1layer
+    write_interval: 1500.0
+  - byte_order: abcd
+    connection_id: pwm_plc1
+    connection_type: keyence
+    data_type: uint16
+    device_type: DM
+    name: L2PWM
+    source_task_id: calc_pwm_2layer
+    start_addr: 15102
+    task_id: pwm_2layer
+    write_interval: 1500.0
+  - byte_order: abcd
+    connection_id: pwm_plc1
+    connection_type: keyence
+    data_type: uint16
+    device_type: DM
+    name: L3PWM
+    source_task_id: calc_pwm_3layer
+    start_addr: 15104
+    task_id: pwm_3layer
+    write_interval: 1500.0
+  - byte_order: abcd
+    connection_id: pwm_plc1
+    connection_type: keyence
+    data_type: uint16
+    device_type: DM
+    name: L4_PWM
+    source_task_id: calc_pwm_4layer
+    start_addr: 15106
+    task_id: pwm_4layer
+    write_interval: 1500.0
+
+connections:
+  dte_rtu_com9:
+    params:
+      baudrate: 115200
+      bytesize: 8
+      parity: E
+      port: COM9
+      slave_id: 1
+      stopbits: 1
+      timeout: 1.0
+    type: modbus_rtu
+  pt100_rtu_com11:
+    params:
+      baudrate: 9600
+      bytesize: 8
+      parity: N
+      port: COM11
+      slave_id: 0
+      stopbits: 1
+      timeout: 1.0
+    type: modbus_rtu
+  pwm_plc1:
+    params:
+      host: 192.168.2.80
+      port: 8501
+      timeout: 3.0
+      unit: 0
+    type: keyence
+
+poll_interval: 10.0
+
+tasks:
+  # PT100 1‑12路 (模具表面温度)
+  - byte_order: abcd
+    channel_name: 第1路温度（1层-左）
+    channel_prefix: temp_ch1
+    connection_id: pt100_rtu_com11
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.01
+    start_addr: 0
+    task_id: t1
+    unit: °C
+  - byte_order: abcd
+    channel_name: 第2路温度（1层-中）
+    channel_prefix: temp_ch2
+    connection_id: pt100_rtu_com11
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.01
+    start_addr: 1
+    task_id: t2
+    unit: °C
+  - byte_order: abcd
+    channel_name: 第3路温度（1层-右）
+    channel_prefix: temp_ch3
+    connection_id: pt100_rtu_com11
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.01
+    start_addr: 2
+    task_id: t3
+    unit: °C
+  - byte_order: abcd
+    channel_name: 第4路温度（2层-左）
+    channel_prefix: temp_ch4
+    connection_id: pt100_rtu_com11
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.01
+    start_addr: 3
+    task_id: t4
+    unit: °C
+  - byte_order: abcd
+    channel_name: 第5路温度（2层-中）
+    channel_prefix: temp_ch5
+    connection_id: pt100_rtu_com11
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.01
+    start_addr: 4
+    task_id: t5
+    unit: °C
+  - byte_order: abcd
+    channel_name: 第6路温度（2层-右）
+    channel_prefix: temp_ch6
+    connection_id: pt100_rtu_com11
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.01
+    start_addr: 5
+    task_id: t6
+    unit: °C
+  - byte_order: abcd
+    channel_name: 第7路温度（3层-左）
+    channel_prefix: temp_ch7
+    connection_id: pt100_rtu_com11
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.01
+    start_addr: 6
+    task_id: t7
+    unit: °C
+  - byte_order: abcd
+    channel_name: 第8路温度（3层-中）
+    channel_prefix: temp_ch8
+    connection_id: pt100_rtu_com11
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.01
+    start_addr: 7
+    task_id: t8
+    unit: °C
+  - byte_order: abcd
+    channel_name: 第9路温度（3层-右）
+    channel_prefix: temp_ch9
+    connection_id: pt100_rtu_com11
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.01
+    start_addr: 8
+    task_id: t9
+    unit: °C
+  - byte_order: abcd
+    channel_name: 第10路温度（4层-左）
+    channel_prefix: temp_ch10
+    connection_id: pt100_rtu_com11
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.01
+    start_addr: 9
+    task_id: t10
+    unit: °C
+  - byte_order: abcd
+    channel_name: 第11路温度（4层-中）
+    channel_prefix: temp_ch11
+    connection_id: pt100_rtu_com11
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.01
+    start_addr: 10
+    task_id: t11
+    unit: °C
+  - byte_order: abcd
+    channel_name: 第12路温度（4层-右）
+    channel_prefix: temp_ch12
+    connection_id: pt100_rtu_com11
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.01
+    start_addr: 11
+    task_id: t12
+    unit: °C
+
+  # 核心温度采集 P1‑P8 (加热棒内部/核心温度)
+  - byte_order: abcd
+    channel_name: 核心温度P1
+    channel_prefix: core_temp_p1
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4096
+    task_id: p1
+    unit: °C
+  - byte_order: abcd
+    channel_name: 核心温度P2
+    channel_prefix: core_temp_p2
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4097
+    task_id: p2
+    unit: °C
+  - byte_order: abcd
+    channel_name: 核心温度P3
+    channel_prefix: core_temp_p3
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4098
+    task_id: p3
+    unit: °C
+  - byte_order: abcd
+    channel_name: 核心温度P4
+    channel_prefix: core_temp_p4
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4099
+    task_id: p4
+    unit: °C
+  - byte_order: abcd
+    channel_name: 核心温度P5
+    channel_prefix: core_temp_p5
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4100
+    task_id: p5
+    unit: °C
+  - byte_order: abcd
+    channel_name: 核心温度P6
+    channel_prefix: core_temp_p6
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4101
+    task_id: p6
+    unit: °C
+  - byte_order: abcd
+    channel_name: 核心温度P7
+    channel_prefix: core_temp_p7
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4102
+    task_id: p7
+    unit: °C
+  - byte_order: abcd
+    channel_name: 核心温度P8
+    channel_prefix: core_temp_p8
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4103
+    task_id: p8
+    unit: °C
+
+  # SV设定读取 CH1‑CH8
+  - byte_order: abcd
+    channel_name: L1_SV1
+    channel_prefix: sv_ch1
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4104
+    task_id: sv1
+    unit: °C
+  - byte_order: abcd
+    channel_name: L1_SV2
+    channel_prefix: sv_ch2
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4105
+    task_id: sv2
+    unit: °C
+  - byte_order: abcd
+    channel_name: L2_SV3
+    channel_prefix: sv_ch3
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4106
+    task_id: sv3
+    unit: °C
+  - byte_order: abcd
+    channel_name: L2_SV4
+    channel_prefix: sv_ch4
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4107
+    task_id: sv4
+    unit: °C
+  - byte_order: abcd
+    channel_name: L3_SV5
+    channel_prefix: sv_ch5
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4108
+    task_id: sv5
+    unit: °C
+  - byte_order: abcd
+    channel_name: L3_SV6
+    channel_prefix: sv_ch6
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4109
+    task_id: sv6
+    unit: °C
+  # 更正：4层 sv7(左) sv8(右)，对应寄存器 sv7->4111, sv8->4110
+  - byte_order: abcd
+    channel_name: L4_SV7(左)
+    channel_prefix: sv_ch7
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4111
+    task_id: sv7
+    unit: °C
+  - byte_order: abcd
+    channel_name: L4_SV8(右)
+    channel_prefix: sv_ch8
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4110
+    task_id: sv8
+    unit: °C
+
+  # 基恩士PLC PWM占空比读取
+  - byte_order: abcd
+    channel_name: L1_PWM_DM15100
+    channel_prefix: lower_mid_heater
+    connection_id: pwm_plc1
+    connection_type: keyence
+    data_type: uint16
+    device_type: DM
+    offset: 0
+    quantity: 1
+    scale: 1.0
+    start_addr: 15100
+    task_id: L1PWM
+    unit: '%'
+  - byte_order: abcd
+    channel_name: L2_PWM_DM15102
+    channel_prefix: mid_lower_mid_heater
+    connection_id: pwm_plc1
+    connection_type: keyence
+    data_type: uint16
+    device_type: DM
+    offset: 0
+    quantity: 1
+    scale: 1.0
+    start_addr: 15102
+    task_id: L2PWM
+    unit: '%'
+  - byte_order: abcd
+    channel_name: L3_PWM_DM15104
+    channel_prefix: mid_upper_mid_heater
+    connection_id: pwm_plc1
+    connection_type: keyence
+    data_type: uint16
+    device_type: DM
+    offset: 0
+    quantity: 1
+    scale: 1.0
+    start_addr: 15104
+    task_id: L3PWM
+    unit: '%'
+  - byte_order: abcd
+    channel_name: L4_PWM_DM15106
+    channel_prefix: upper_mid_heater
+    connection_id: pwm_plc1
+    connection_type: keyence
+    data_type: uint16
+    device_type: DM
+    offset: 0
+    quantity: 1
+    scale: 1.0
+    start_addr: 15106
+    task_id: L4_PWM
+    unit: '%'
+
+  # CH1‑CH8输出功率读取
+  - byte_order: abcd
+    channel_name: CH1输出功率1
+    channel_prefix: out1_ch1
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4208
+    task_id: task_out1_ch1
+    unit: '%'
+  - byte_order: abcd
+    channel_name: CH2输出功率1
+    channel_prefix: out1_ch2
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4209
+    task_id: task_out1_ch2
+    unit: '%'
+  - byte_order: abcd
+    channel_name: CH3输出功率1
+    channel_prefix: out1_ch3
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4210
+    task_id: task_out1_ch3
+    unit: '%'
+  - byte_order: abcd
+    channel_name: CH4输出功率1
+    channel_prefix: out1_ch4
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4211
+    task_id: task_out1_ch4
+    unit: '%'
+  - byte_order: abcd
+    channel_name: CH5输出功率1
+    channel_prefix: out1_ch5
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4212
+    task_id: task_out1_ch5
+    unit: '%'
+  - byte_order: abcd
+    channel_name: CH6输出功率1
+    channel_prefix: out1_ch6
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4213
+    task_id: task_out1_ch6
+    unit: '%'
+  - byte_order: abcd
+    channel_name: CH7输出功率1
+    channel_prefix: out1_ch7
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4214
+    task_id: task_out1_ch7
+    unit: '%'
+  - byte_order: abcd
+    channel_name: CH8输出功率1
+    channel_prefix: out1_ch8
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    offset: 0
+    quantity: 1
+    scale: 0.1
+    start_addr: 4215
+    task_id: task_out1_ch8
+    unit: '%'
+
+write_tasks:
+  # PID模式任务 (所有通道设为0，使用外部SV写入控制)
+  - byte_order: abcd
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    name: CH1的PID模式
+    start_addr: 4280
+    task_id: wtask_mode_ch1
+    value: 0.0
+    write_interval: 1500.0
+  - byte_order: abcd
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    name: CH2的PID模式
+    start_addr: 4281
+    task_id: wtask_mode_ch2
+    value: 0.0
+    write_interval: 1500.0
+  - byte_order: abcd
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    name: CH3的PID模式
+    start_addr: 4282
+    task_id: wtask_mode_ch3
+    value: 0.0
+    write_interval: 1500.0
+  - byte_order: abcd
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    name: CH4的PID模式
+    start_addr: 4283
+    task_id: wtask_mode_ch4
+    value: 0.0
+    write_interval: 1500.0
+  - byte_order: abcd
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    name: CH5的PID模式
+    start_addr: 4284
+    task_id: wtask_mode_ch5
+    value: 0.0
+    write_interval: 1500.0
+  - byte_order: abcd
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    name: CH6的PID模式
+    start_addr: 4285
+    task_id: wtask_mode_ch6
+    value: 0.0
+    write_interval: 1500.0
+  - byte_order: abcd
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    name: CH7的PID模式
+    start_addr: 4286
+    task_id: wtask_mode_ch7
+    value: 0.0
+    write_interval: 1500.0
+  - byte_order: abcd
+    connection_id: dte_rtu_com9
+    connection_type: modbus_rtu
+    data_type: uint16
+    device_type: holding
+    name: CH8的PID模式
+    start_addr: 4287
+    task_id: wtask_mode_ch8
+    value: 0.0
+    write_interval: 1500.0
