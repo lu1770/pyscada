@@ -298,7 +298,7 @@ connections:
       bytesize: 8
       parity: N
       port: COM11
-      slave_id: 0
+      slave_id: 1
       stopbits: 1
       timeout: 1.0
     type: modbus_rtu
