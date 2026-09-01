@@ -86,7 +86,7 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/yourusername/pyscada.git
+git clone https://github.com/lu1770/pyscada.git
 cd pyscada
 
 # 安装依赖
@@ -344,7 +344,7 @@ Multi-Channel Industrial Data Acquisition System is a Python-based cross-platfor
 ## Installation
 
 ```bash
-git clone https://github.com/yourusername/pyscada.git
+git clone https://github.com/lu1770/pyscada.git
 cd pyscada
 pip install -r requirements.txt
 python main.py
