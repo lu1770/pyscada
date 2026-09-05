@@ -158,11 +158,8 @@ class DataStore:
 
     def find_channel_by_prefix(self, prefix: str) -> Optional[str]:
         """根据 channel_prefix 查找第一个匹配的 channel_id"""
-        with self._lock:
-            for cid in self._channels:
-                if cid.startswith(prefix):
-                    return cid
-            return None
+        matches = self.find_channels_by_prefix(prefix)
+        return matches[0] if matches else None
 
     def find_channels_by_prefix(self, prefix: str) -> list:
         """根据 channel_prefix 查找所有匹配的 channel_id"""
@@ -445,6 +442,17 @@ def _populate_device_combo(cmb_device, conn_type: str, writable: bool = False):
         cmb_device.addItems(["DM", "MR", "LR", "TIM", "CNT", "VR"])
 
 
+def _refresh_device_combo(cmb_conn, cmb_device, connections: dict,
+                          writable: bool):
+    """连接下拉框切换时刷新设备类型下拉框。三个任务对话框共用。"""
+    cid = cmb_conn.currentData()
+    if cid is None:
+        return
+    info = connections.get(cid)
+    if info:
+        _populate_device_combo(cmb_device, info["type"], writable=writable)
+
+
 def _create_data_type_combo() -> QComboBox:
     """创建数据类型下拉框（8 种 Modbus 标准类型）"""
     cmb = QComboBox()
@@ -476,6 +484,42 @@ def _make_ok_cancel_layout(parent: QWidget, on_ok) -> QHBoxLayout:
     btn_layout.addWidget(btn_ok)
     btn_layout.addWidget(btn_cancel)
     return btn_layout
+
+
+# ================================================================
+#  共享: 基于 socket 的连接生命周期混入（TCP 类连接器共用）
+# ================================================================
+class _TCPConnectorMixin:
+    """提供基于 TCP socket 的 connect / disconnect / is_connected 实现。
+    ModbusTCPConnector 与 KeyencePLCConnector 共用此逻辑，避免重复。
+    子类需具备 self.host / self.port / self.timeout / self._sock / self._lock。"""
+
+    def connect(self) -> bool:
+        with self._lock:
+            # 释放可能残留的旧句柄，避免重连时旧 socket 泄漏/冲突
+            self.disconnect()
+            try:
+                self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self._sock.settimeout(self.timeout)
+                self._sock.connect((self.host, self.port))
+                return True
+            except Exception as e:
+                print(f"[{getattr(self, 'LOG_TAG', 'TCP')}] 连接失败 "
+                      f"{self.host}:{self.port} -> {e}")
+                self._sock = None
+                return False
+
+    def disconnect(self):
+        with self._lock:
+            if self._sock:
+                try:
+                    self._sock.close()
+                except Exception:
+                    pass
+                self._sock = None
+
+    def is_connected(self) -> bool:
+        return self._sock is not None
 
 
 # ================================================================
@@ -528,17 +572,35 @@ class ModbusBaseConnector:
         raise NotImplementedError
 
     # ---- 读取接口（三种传输共用）----
-    def read_holding_registers(self, start_addr: int, quantity: int):
-        resp = self._send_request(self.FUNC_READ_HOLDING, start_addr, quantity)
+    def _read_registers(self, func_code: int, start_addr: int,
+                        quantity: int) -> Optional[bytes]:
+        """读寄存器请求的统一入口：发送请求并提取原始字节，失败返回 None。"""
+        resp = self._send_request(func_code, start_addr, quantity)
         if resp is None:
             return None
-        return self._parse_register_response(resp)
+        return self._extract_raw_register_data(resp)
+
+    @staticmethod
+    def _parse_register_data(reg_data: bytes):
+        """将原始寄存器字节解析为 16 位整数值列表。"""
+        values = []
+        for i in range(0, len(reg_data), 2):
+            chunk = reg_data[i:i + 2]
+            if len(chunk) == 2:
+                values.append(struct.unpack(">H", chunk)[0])
+            elif len(chunk) == 1:
+                values.append(chunk[0])
+        return values
+
+    def read_holding_registers(self, start_addr: int, quantity: int):
+        reg_data = self._read_registers(
+            self.FUNC_READ_HOLDING, start_addr, quantity)
+        return self._parse_register_data(reg_data) if reg_data is not None else None
 
     def read_input_registers(self, start_addr: int, quantity: int):
-        resp = self._send_request(self.FUNC_READ_INPUT_REG, start_addr, quantity)
-        if resp is None:
-            return None
-        return self._parse_register_response(resp)
+        reg_data = self._read_registers(
+            self.FUNC_READ_INPUT_REG, start_addr, quantity)
+        return self._parse_register_data(reg_data) if reg_data is not None else None
 
     def read_coils(self, start_addr: int, quantity: int):
         resp = self._send_request(self.FUNC_READ_COILS, start_addr, quantity)
@@ -547,16 +609,12 @@ class ModbusBaseConnector:
         return self._parse_bit_response(resp, quantity)
 
     def read_holding_registers_raw(self, start_addr: int, quantity: int) -> Optional[bytes]:
-        resp = self._send_request(self.FUNC_READ_HOLDING, start_addr, quantity)
-        if resp is None:
-            return None
-        return self._extract_raw_register_data(resp)
+        return self._read_registers(
+            self.FUNC_READ_HOLDING, start_addr, quantity)
 
     def read_input_registers_raw(self, start_addr: int, quantity: int) -> Optional[bytes]:
-        resp = self._send_request(self.FUNC_READ_INPUT_REG, start_addr, quantity)
-        if resp is None:
-            return None
-        return self._extract_raw_register_data(resp)
+        return self._read_registers(
+            self.FUNC_READ_INPUT_REG, start_addr, quantity)
 
     # ---- PDU 解析（统一布局: [slave_id, func_code, byte_count, ...data]）----
     def _check_exception(self, pdu: bytes):
@@ -573,19 +631,6 @@ class ModbusBaseConnector:
             return None
         byte_count = pdu[2]
         return pdu[3:3 + byte_count]
-
-    def _parse_register_response(self, pdu: bytes):
-        reg_data = self._extract_raw_register_data(pdu)
-        if reg_data is None:
-            return None
-        values = []
-        for i in range(0, len(reg_data), 2):
-            chunk = reg_data[i:i + 2]
-            if len(chunk) == 2:
-                values.append(struct.unpack(">H", chunk)[0])
-            elif len(chunk) == 1:
-                values.append(chunk[0])
-        return values
 
     def _parse_bit_response(self, pdu: bytes, quantity: int):
         if len(pdu) < 3 or self._check_exception(pdu) is None:
@@ -635,8 +680,9 @@ class ModbusBaseConnector:
         return self._send_write_request(self.FUNC_WRITE_MULTI_REGS, pdu_body)
 
 
-class ModbusTCPConnector(ModbusBaseConnector):
-    """Modbus TCP 连接器 — 纯 socket 实现，无 pymodbus 依赖"""
+class ModbusTCPConnector(_TCPConnectorMixin, ModbusBaseConnector):
+    """Modbus TCP 连接器 — 纯 socket 实现，无 pymodbus 依赖
+    connect/disconnect/is_connected 由 _TCPConnectorMixin 提供（MRO 中排在前面以覆盖基类的抽象实现）。"""
 
     LOG_TAG = "Modbus"
 
@@ -647,32 +693,6 @@ class ModbusTCPConnector(ModbusBaseConnector):
         self.port = port
         self._sock: Optional[socket.socket] = None
         self._txn_id = 0
-
-    def connect(self) -> bool:
-        with self._lock:
-            # 释放可能残留的旧句柄，避免重连时旧 socket 泄漏/冲突
-            self.disconnect()
-            try:
-                self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                self._sock.settimeout(self.timeout)
-                self._sock.connect((self.host, self.port))
-                return True
-            except Exception as e:
-                print(f"[Modbus] 连接失败 {self.host}:{self.port} -> {e}")
-                self._sock = None
-                return False
-
-    def disconnect(self):
-        with self._lock:
-            if self._sock:
-                try:
-                    self._sock.close()
-                except Exception:
-                    pass
-                self._sock = None
-
-    def is_connected(self) -> bool:
-        return self._sock is not None
 
     def _send_request(self, func_code: int, start_addr: int,
                       quantity: int) -> Optional[bytes]:
@@ -1028,7 +1048,7 @@ class ModbusASCIIConnector(ModbusSerialConnector):
 # ================================================================
 #  第四部分: 基恩士(Keyence) PLC 连接器
 # ================================================================
-class KeyencePLCConnector:
+class KeyencePLCConnector(_TCPConnectorMixin):
     """
     基恩士 PLC 上位链接协议连接器
     适用型号: KV-5500/7500/8000/Nano 等
@@ -1040,7 +1060,11 @@ class KeyencePLCConnector:
     - .UD: 无符号32位整数（占2个寄存器）
     - .D:  有符号32位整数（占2个寄存器）
     - .F:  32位浮点数（占2个寄存器）
+
+    connect/disconnect/is_connected 由 _TCPConnectorMixin 提供。
     """
+
+    LOG_TAG = "Keyence"
 
     KEYENCE_TYPE_MAP = {
         "uint16":  ".U",
@@ -1062,32 +1086,6 @@ class KeyencePLCConnector:
         self.unit = unit
         self._sock: Optional[socket.socket] = None
         self._lock = threading.RLock()  # 可重入：允许 connect()→disconnect()、_send_command异常→disconnect() 同线程嵌套
-
-    def connect(self) -> bool:
-        with self._lock:
-            # 释放可能残留的旧句柄，避免重连时旧 socket 泄漏/冲突
-            self.disconnect()
-            try:
-                self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                self._sock.settimeout(self.timeout)
-                self._sock.connect((self.host, self.port))
-                return True
-            except Exception as e:
-                print(f"[Keyence] 连接失败 {self.host}:{self.port} -> {e}")
-                self._sock = None
-                return False
-
-    def disconnect(self):
-        with self._lock:
-            if self._sock:
-                try:
-                    self._sock.close()
-                except Exception:
-                    pass
-                self._sock = None
-
-    def is_connected(self) -> bool:
-        return self._sock is not None
 
     def _send_command(self, cmd: str) -> Optional[str]:
         with self._lock:
@@ -2373,12 +2371,8 @@ class TaskConfigDialog(QWidget):
 
     @_safe_event
     def _on_conn_changed(self, *args):
-        cid = self.cmb_conn.currentData()
-        if cid is None:
-            return
-        info = self._connections.get(cid)
-        if info:
-            _populate_device_combo(self.cmb_device, info["type"], writable=False)
+        _refresh_device_combo(self.cmb_conn, self.cmb_device,
+                              self._connections, writable=False)
 
     @_safe_event
     def _on_ok(self):
@@ -2475,13 +2469,8 @@ class WriteTaskConfigDialog(QWidget):
 
     @_safe_event
     def _on_conn_changed(self, *args):
-        cid = self.cmb_conn.currentData()
-        if cid is None:
-            return
-        info = self._connections.get(cid)
-        if info:
-            # input 区域不可写，仅提供 holding 与 coil
-            _populate_device_combo(self.cmb_device, info["type"], writable=True)
+        _refresh_device_combo(self.cmb_conn, self.cmb_device,
+                              self._connections, writable=True)
 
     @_safe_event
     def _on_ok(self):
@@ -2746,13 +2735,8 @@ class CalcWriteTaskConfigDialog(QWidget):
 
     @_safe_event
     def _on_conn_changed(self, *args):
-        cid = self.cmb_conn.currentData()
-        if cid is None:
-            return
-        info = self._connections.get(cid)
-        if info:
-            # input 区域不可写，仅提供 holding 与 coil
-            _populate_device_combo(self.cmb_device, info["type"], writable=True)
+        _refresh_device_combo(self.cmb_conn, self.cmb_device,
+                              self._connections, writable=True)
 
     @_safe_event
     def _on_ok(self):
@@ -3206,9 +3190,10 @@ class MainWindow(QMainWindow):
                 self.table_calc.setItem(i, 4, QTableWidgetItem(str(task.scale)))
 
     @_safe_event
-    def _ensure_chart_for_calc_task(self, task: CalcTask):
+    def _ensure_chart(self, task, chart_id: str):
+        """确保某任务的图表与磁贴已创建。采集任务与计算任务共用此逻辑。
+        chart_id 区分两者：采集任务用 task_id，计算任务用 channel_prefix。"""
         self._placeholder_label.setVisible(False)
-        chart_id = task.channel_prefix
         if chart_id not in self._chart_widgets:
             chart = ChartWidget(title=task.channel_name)
             self.chart_container.addWidget(chart)
@@ -3218,11 +3203,14 @@ class MainWindow(QMainWindow):
             if cid not in self._channel_to_chart:
                 chart.add_channel(cid, cname)
                 self._channel_to_chart[cid] = chart_id
-            # 同步创建磁贴（计算通道单位取自任务配置）
+            # 同步创建磁贴（单位取自通道元数据，回退到任务配置的 unit）
             if not self.tile_display.has_channel(cid):
                 meta = self.store.get_channel_meta(cid)
-                self.tile_display.add_channel(cid, cname,
-                                              meta.get("unit", task.unit))
+                self.tile_display.add_channel(
+                    cid, cname, meta.get("unit", getattr(task, "unit", "")))
+
+    def _ensure_chart_for_calc_task(self, task: CalcTask):
+        self._ensure_chart(task, task.channel_prefix)
 
     # ---- 写入任务管理 ----
     @_safe_event
@@ -3435,22 +3423,7 @@ class MainWindow(QMainWindow):
 
     @_safe_event
     def _ensure_chart_for_task(self, task):
-        self._placeholder_label.setVisible(False)
-        chart_id = task.task_id
-        if chart_id not in self._chart_widgets:
-            chart = ChartWidget(title=task.channel_name)
-            self.chart_container.addWidget(chart)
-            self._chart_widgets[chart_id] = chart
-        chart = self._chart_widgets[chart_id]
-        for cid, cname in zip(task.get_channel_ids(), task.get_channel_names()):
-            if cid not in self._channel_to_chart:
-                chart.add_channel(cid, cname)
-                self._channel_to_chart[cid] = chart_id
-            # 同步创建磁贴（单位取自通道元数据）
-            if not self.tile_display.has_channel(cid):
-                meta = self.store.get_channel_meta(cid)
-                self.tile_display.add_channel(cid, cname,
-                                              meta.get("unit", ""))
+        self._ensure_chart(task, task.task_id)
 
     # ---- 采集控制 ----
     def _set_running_state(self, running: bool):
