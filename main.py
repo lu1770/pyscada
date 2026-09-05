@@ -394,6 +394,23 @@ _BYTE_ORDER_ITEMS = [
     "badc (双字节交换)", "cdab (四字交换)"
 ]
 
+# 全部支持的连接类型（连接/任务表格内联编辑校验共用）
+_MODBUS_CONN_TYPES = ("modbus_tcp", "modbus_rtu", "modbus_ascii")
+_SERIAL_CONN_TYPES = ("modbus_rtu", "modbus_ascii")
+_CONNECTION_TYPES = _MODBUS_CONN_TYPES + ("keyence",)
+
+# 数据类型 → 每个值占用的 16 位寄存器数量（采集/写入任务共用）
+_TYPE_REGISTER_COUNT = {
+    "int16": 1, "uint16": 1,
+    "int32": 2, "uint32": 2, "float32": 2,
+    "int64": 4, "uint64": 4, "float64": 4,
+}
+
+
+def _registers_per_value(data_type: str) -> int:
+    """数据类型对应的 16 位寄存器数量（未知类型按 1 个寄存器处理）"""
+    return _TYPE_REGISTER_COUNT.get(data_type.lower(), 1)
+
 
 def _words_to_bytes(words) -> bytes:
     """将 16 位寄存器值列表打包为大端原始字节（每个值 2 字节）。
@@ -416,7 +433,7 @@ def _connection_display_label(cid: str, info: dict) -> str:
     conn_type = info["type"]
     label = f"{cid} ({conn_type})"
     p = info["params"]
-    if conn_type in ("modbus_rtu", "modbus_ascii"):
+    if conn_type in _SERIAL_CONN_TYPES:
         label += f" {p.get('port', '')} @ {p.get('baudrate', 9600)}"
     else:
         default_port = 502 if conn_type == "modbus_tcp" else 3000
@@ -435,7 +452,7 @@ def _populate_device_combo(cmb_device, conn_type: str, writable: bool = False):
     """根据连接类型填充设备类型下拉框。
     writable=True 时仅提供可写区域（holding/coil），否则含 input 只读区域。"""
     cmb_device.clear()
-    if conn_type in ("modbus_tcp", "modbus_rtu", "modbus_ascii"):
+    if conn_type in _MODBUS_CONN_TYPES:
         cmb_device.addItems(["holding", "coil"] if writable
                             else ["holding", "input", "coil"])
     elif conn_type == "keyence":
@@ -484,6 +501,48 @@ def _make_ok_cancel_layout(parent: QWidget, on_ok) -> QHBoxLayout:
     btn_layout.addWidget(btn_ok)
     btn_layout.addWidget(btn_cancel)
     return btn_layout
+
+
+def _create_connection_combo(connections: dict) -> QComboBox:
+    """创建 '所属连接' 下拉框（采集/写入/计算写入对话框共用）"""
+    cmb = QComboBox()
+    for cid, info in connections.items():
+        cmb.addItem(_connection_display_label(cid, info), cid)
+    return cmb
+
+
+def _create_addr_spin() -> QSpinBox:
+    """创建起始地址输入框（0-999999，各任务对话框共用）"""
+    spin = QSpinBox()
+    spin.setRange(0, 999999)
+    return spin
+
+
+def _create_interval_spin() -> QDoubleSpinBox:
+    """创建写入频率(秒)输入框（固定值写入/计算写入对话框共用）"""
+    spin = QDoubleSpinBox()
+    spin.setRange(0.05, 3600.0)
+    spin.setSingleStep(0.1)
+    spin.setDecimals(3)
+    spin.setValue(1.0)
+    return spin
+
+
+def _create_scale_spin() -> QDoubleSpinBox:
+    """创建缩放系数输入框（采集/计算任务对话框共用）"""
+    spin = QDoubleSpinBox()
+    spin.setRange(-999999, 999999)
+    spin.setDecimals(6)
+    spin.setValue(1.0)
+    return spin
+
+
+def _create_offset_spin() -> QDoubleSpinBox:
+    """创建偏移量输入框（采集/计算任务对话框共用）"""
+    spin = QDoubleSpinBox()
+    spin.setRange(-999999, 999999)
+    spin.setDecimals(6)
+    return spin
 
 
 # ================================================================
@@ -1273,17 +1332,6 @@ class KeyencePLCConnector(_TCPConnectorMixin):
 class PollingTask:
     """单个采集任务配置"""
 
-    _TYPE_TO_REGISTERS = {
-        "int16":   1,
-        "uint16":  1,
-        "int32":   2,
-        "uint32":  2,
-        "float32": 2,
-        "int64":   4,
-        "uint64":  4,
-        "float64": 4,
-    }
-
     def __init__(self, task_id: str, connection_id: str,
                  connection_type: str, device_type: str,
                  start_addr: int, quantity: int,
@@ -1307,7 +1355,7 @@ class PollingTask:
 
     def get_registers_per_value(self) -> int:
         """获取每个值需要的寄存器数量"""
-        return self._TYPE_TO_REGISTERS.get(self.data_type.lower(), 1)
+        return _registers_per_value(self.data_type)
 
     def get_total_registers(self) -> int:
         """获取总共需要读取的寄存器数量"""
@@ -1354,8 +1402,6 @@ class _BaseWriteTask:
       name             任务显示名称（可选）
     """
 
-    _TYPE_TO_REGISTERS = PollingTask._TYPE_TO_REGISTERS
-
     def __init__(self, task_id: str, connection_id: str,
                  connection_type: str, device_type: str,
                  start_addr: int, write_interval: float = 1.0,
@@ -1372,7 +1418,7 @@ class _BaseWriteTask:
         self.name = name or f"写{device_type}{start_addr}"
 
     def get_registers_per_value(self) -> int:
-        return self._TYPE_TO_REGISTERS.get(self.data_type.lower(), 1)
+        return _registers_per_value(self.data_type)
 
     def _base_dict(self) -> dict:
         """公共字段的字典形式（子类 to_dict 在此基础上追加特有字段）"""
@@ -1587,23 +1633,19 @@ class AcquisitionWorker(QObject):
     def add_task(self, task: PollingTask):
         self._tasks.append(task)
         self._task_id_to_task[task.task_id] = task
-        ch_ids = task.get_channel_ids()
-        ch_names = task.get_channel_names()
-        for cid, cname in zip(ch_ids, ch_names):
-            self.store.register_channel(
-                cid, cname, task.unit, task.connection_id,
-                task.scale, task.offset, task.data_type
-            )
+        self._register_task_channels(task, task.connection_id, task.data_type)
 
     def add_calc_task(self, task: CalcTask):
         self._calc_tasks.append(task)
         self._calc_task_id_to_task[task.task_id] = task
-        ch_ids = task.get_channel_ids()
-        ch_names = task.get_channel_names()
-        for cid, cname in zip(ch_ids, ch_names):
+        self._register_task_channels(task, "", "float64")
+
+    def _register_task_channels(self, task, connection_id: str, data_type: str):
+        """将任务产生的通道注册到 DataStore（采集任务与计算任务共用）"""
+        for cid, cname in zip(task.get_channel_ids(), task.get_channel_names()):
             self.store.register_channel(
-                cid, cname, task.unit, "",
-                task.scale, task.offset, "float64"
+                cid, cname, task.unit, connection_id,
+                task.scale, task.offset, data_type
             )
 
     def remove_calc_task(self, task_id: str):
@@ -2202,14 +2244,7 @@ class ConnectionConfigDialog(QWidget):
         self.cmb_type.currentIndexChanged.connect(self._on_type_changed)
         self._on_type_changed()
 
-        btn_layout = QHBoxLayout()
-        btn_ok = QPushButton("确定")
-        btn_cancel = QPushButton("取消")
-        btn_ok.clicked.connect(self._on_ok)
-        btn_cancel.clicked.connect(self.close)
-        btn_layout.addWidget(btn_ok)
-        btn_layout.addWidget(btn_cancel)
-        layout.addLayout(btn_layout, 7, 0, 1, 2)
+        layout.addLayout(_make_ok_cancel_layout(self, self._on_ok), 7, 0, 1, 2)
 
         self.setMinimumWidth(380)
 
@@ -2311,9 +2346,7 @@ class TaskConfigDialog(QWidget):
         layout = QGridLayout(self)
 
         layout.addWidget(QLabel("所属连接:"), 0, 0)
-        self.cmb_conn = QComboBox()
-        for cid, info in self._connections.items():
-            self.cmb_conn.addItem(_connection_display_label(cid, info), cid)
+        self.cmb_conn = _create_connection_combo(self._connections)
         layout.addWidget(self.cmb_conn, 0, 1)
 
         layout.addWidget(QLabel("通道前缀:"), 1, 0)
@@ -2329,8 +2362,7 @@ class TaskConfigDialog(QWidget):
         layout.addWidget(self.cmb_device, 3, 1)
 
         layout.addWidget(QLabel("起始地址:"), 4, 0)
-        self.spin_addr = QSpinBox()
-        self.spin_addr.setRange(0, 999999)
+        self.spin_addr = _create_addr_spin()
         layout.addWidget(self.spin_addr, 4, 1)
 
         layout.addWidget(QLabel("读取数量:"), 5, 0)
@@ -2344,16 +2376,11 @@ class TaskConfigDialog(QWidget):
         layout.addWidget(self.edit_unit, 6, 1)
 
         layout.addWidget(QLabel("缩放系数:"), 7, 0)
-        self.spin_scale = QDoubleSpinBox()
-        self.spin_scale.setRange(-999999, 999999)
-        self.spin_scale.setDecimals(6)
-        self.spin_scale.setValue(1.0)
+        self.spin_scale = _create_scale_spin()
         layout.addWidget(self.spin_scale, 7, 1)
 
         layout.addWidget(QLabel("偏移量:"), 8, 0)
-        self.spin_offset = QDoubleSpinBox()
-        self.spin_offset.setRange(-999999, 999999)
-        self.spin_offset.setDecimals(6)
+        self.spin_offset = _create_offset_spin()
         layout.addWidget(self.spin_offset, 8, 1)
 
         layout.addWidget(QLabel("数据类型:"), 9, 0)
@@ -2405,67 +2432,104 @@ class TaskConfigDialog(QWidget):
         self.close()
 
 
-class WriteTaskConfigDialog(QWidget):
-    """写入任务配置对话框 — 配置写入频率与写入值"""
-    write_task_added = Signal(dict)
+class _BaseWriteTaskDialog(QWidget):
+    """写入类任务对话框基类 — 固定值写入(WriteTaskConfigDialog)与
+    计算值写入(CalcWriteTaskConfigDialog)共用：所属连接、任务名称、设备类型、
+    起始地址、写入频率、数据类型、字节序等公共行，以及任务字典构造与校验流程。
 
-    def __init__(self, connections: dict):
+    子类通过钩子定制差异部分:
+      _conn_label          连接行标签（"所属连接:" / "写入连接:"）
+      _name_required       任务名称为空时是否弹警告（否则回退 _default_name()）
+      _default_name()      名称输入框默认值/空名称回退值
+      _task_id_prefix()    任务ID前缀（"wtask" / "calcwrite"）
+      _add_extra_rows()    在起始地址行之后插入特有行，返回下一可用行号
+      _validate()          附加校验，返回错误信息字符串或 None
+      _extend_task_dict()  向任务字典追加特有字段（value / source_task_id）
+    """
+
+    task_submitted = Signal(dict)
+
+    _conn_label = "所属连接:"
+    _name_required = False
+
+    def __init__(self, connections: dict, title: str, min_width: int = 400):
         super().__init__()
         self._connections = connections
-        self.setWindowTitle("添加写入任务")
+        self.setWindowTitle(title)
         self.setWindowModality(Qt.ApplicationModal)
-        self.setMinimumWidth(400)
+        self.setMinimumWidth(min_width)
         self._build_ui()
 
     def _build_ui(self):
-        layout = QGridLayout(self)
+        """子类实现：创建布局并调用 _add_common_write_rows 填充公共行"""
+        raise NotImplementedError
 
-        layout.addWidget(QLabel("所属连接:"), 0, 0)
-        self.cmb_conn = QComboBox()
-        for cid, info in self._connections.items():
-            self.cmb_conn.addItem(_connection_display_label(cid, info), cid)
-        layout.addWidget(self.cmb_conn, 0, 1)
+    def _add_common_write_rows(self, layout: QGridLayout, start_row: int) -> int:
+        """添加写入任务公共行，返回下一个可用行号。
+        子类特有行经 _add_extra_rows 钩子插在起始地址与写入频率之间。"""
+        r = start_row
 
-        layout.addWidget(QLabel("任务名称:"), 1, 0)
-        self.edit_name = QLineEdit("写值任务")
-        layout.addWidget(self.edit_name, 1, 1)
+        layout.addWidget(QLabel(self._conn_label), r, 0)
+        self.cmb_conn = _create_connection_combo(self._connections)
+        layout.addWidget(self.cmb_conn, r, 1)
+        r += 1
 
-        layout.addWidget(QLabel("设备类型:"), 2, 0)
+        layout.addWidget(QLabel("任务名称:"), r, 0)
+        self.edit_name = QLineEdit(self._default_name())
+        layout.addWidget(self.edit_name, r, 1)
+        r += 1
+
+        layout.addWidget(QLabel("设备类型:"), r, 0)
         self.cmb_device = QComboBox()
-        layout.addWidget(self.cmb_device, 2, 1)
+        layout.addWidget(self.cmb_device, r, 1)
+        r += 1
 
-        layout.addWidget(QLabel("起始地址:"), 3, 0)
-        self.spin_addr = QSpinBox()
-        self.spin_addr.setRange(0, 999999)
-        layout.addWidget(self.spin_addr, 3, 1)
+        layout.addWidget(QLabel("起始地址:"), r, 0)
+        self.spin_addr = _create_addr_spin()
+        layout.addWidget(self.spin_addr, r, 1)
+        r += 1
 
-        layout.addWidget(QLabel("写入值:"), 4, 0)
-        self.spin_value = QDoubleSpinBox()
-        self.spin_value.setRange(-999999999, 999999999)
-        self.spin_value.setDecimals(6)
-        self.spin_value.setValue(0.0)
-        layout.addWidget(self.spin_value, 4, 1)
+        r = self._add_extra_rows(layout, r)
 
-        layout.addWidget(QLabel("写入频率(秒):"), 5, 0)
-        self.spin_interval = QDoubleSpinBox()
-        self.spin_interval.setRange(0.05, 3600.0)
-        self.spin_interval.setSingleStep(0.1)
-        self.spin_interval.setDecimals(3)
-        self.spin_interval.setValue(1.0)
-        layout.addWidget(self.spin_interval, 5, 1)
+        layout.addWidget(QLabel("写入频率(秒):"), r, 0)
+        self.spin_interval = _create_interval_spin()
+        layout.addWidget(self.spin_interval, r, 1)
+        r += 1
 
-        layout.addWidget(QLabel("数据类型:"), 6, 0)
+        layout.addWidget(QLabel("数据类型:"), r, 0)
         self.cmb_data_type = _create_data_type_combo()
-        layout.addWidget(self.cmb_data_type, 6, 1)
+        layout.addWidget(self.cmb_data_type, r, 1)
+        r += 1
 
-        layout.addWidget(QLabel("字节序:"), 7, 0)
+        layout.addWidget(QLabel("字节序:"), r, 0)
         self.cmb_byte_order = _create_byte_order_combo()
-        layout.addWidget(self.cmb_byte_order, 7, 1)
+        layout.addWidget(self.cmb_byte_order, r, 1)
+        r += 1
 
         self.cmb_conn.currentIndexChanged.connect(self._on_conn_changed)
         self._on_conn_changed()
 
-        layout.addLayout(_make_ok_cancel_layout(self, self._on_ok), 8, 0, 1, 2)
+        layout.addLayout(_make_ok_cancel_layout(self, self._on_ok),
+                         r, 0, 1, 2)
+        return r + 1
+
+    # ---- 子类钩子 ----
+    def _default_name(self) -> str:
+        return "写值任务"
+
+    def _task_id_prefix(self) -> str:
+        return "wtask"
+
+    def _add_extra_rows(self, layout: QGridLayout, row: int) -> int:
+        """在起始地址行之后、写入频率行之前插入子类特有行"""
+        return row
+
+    def _validate(self):
+        """附加校验：返回错误信息字符串；无错误返回 None"""
+        return None
+
+    def _extend_task_dict(self, task_dict: dict):
+        """向任务字典追加子类特有字段"""
 
     @_safe_event
     def _on_conn_changed(self, *args):
@@ -2474,32 +2538,60 @@ class WriteTaskConfigDialog(QWidget):
 
     @_safe_event
     def _on_ok(self):
-        name = self.edit_name.text().strip()
-        if not name:
-            QMessageBox.warning(self, "警告", "请填写任务名称")
-            return
         cid = self.cmb_conn.currentData()
         if cid is None:
             QMessageBox.warning(self, "警告", "请选择所属连接")
             return
-
-        data_type = self.cmb_data_type.currentText()
-        byte_order = _combo_byte_order(self.cmb_byte_order)
+        name = self.edit_name.text().strip()
+        if not name:
+            if self._name_required:
+                QMessageBox.warning(self, "警告", "请填写任务名称")
+                return
+            name = self._default_name()
+        error = self._validate()
+        if error:
+            QMessageBox.warning(self, "警告", error)
+            return
 
         task_dict = {
-            "task_id": f"wtask_{int(time.time()*1000)}",
+            "task_id": f"{self._task_id_prefix()}_{int(time.time()*1000)}",
             "connection_id": cid,
             "connection_type": self._connections[cid]["type"],
             "device_type": self.cmb_device.currentText(),
             "start_addr": self.spin_addr.value(),
-            "value": self.spin_value.value(),
             "write_interval": self.spin_interval.value(),
-            "data_type": data_type,
-            "byte_order": byte_order,
+            "data_type": self.cmb_data_type.currentText(),
+            "byte_order": _combo_byte_order(self.cmb_byte_order),
             "name": name,
         }
-        self.write_task_added.emit(task_dict)
+        self._extend_task_dict(task_dict)
+        self.task_submitted.emit(task_dict)
         self.close()
+
+
+class WriteTaskConfigDialog(_BaseWriteTaskDialog):
+    """写入任务配置对话框 — 配置写入频率与固定写入值"""
+
+    _name_required = True  # 固定值写入必须填写任务名称
+
+    def __init__(self, connections: dict):
+        super().__init__(connections, "添加写入任务")
+
+    def _build_ui(self):
+        layout = QGridLayout(self)
+        self._add_common_write_rows(layout, 0)
+
+    def _add_extra_rows(self, layout, row):
+        layout.addWidget(QLabel("写入值:"), row, 0)
+        self.spin_value = QDoubleSpinBox()
+        self.spin_value.setRange(-999999999, 999999999)
+        self.spin_value.setDecimals(6)
+        self.spin_value.setValue(0.0)
+        layout.addWidget(self.spin_value, row, 1)
+        return row + 1
+
+    def _extend_task_dict(self, task_dict):
+        task_dict["value"] = self.spin_value.value()
 
 
 # ================================================================
@@ -2541,16 +2633,11 @@ class CalcTaskConfigDialog(QWidget):
         layout.addWidget(self.edit_unit, 3, 1)
 
         layout.addWidget(QLabel("缩放系数:"), 4, 0)
-        self.spin_scale = QDoubleSpinBox()
-        self.spin_scale.setRange(-999999, 999999)
-        self.spin_scale.setDecimals(6)
-        self.spin_scale.setValue(1.0)
+        self.spin_scale = _create_scale_spin()
         layout.addWidget(self.spin_scale, 4, 1)
 
         layout.addWidget(QLabel("偏移量:"), 5, 0)
-        self.spin_offset = QDoubleSpinBox()
-        self.spin_offset.setRange(-999999, 999999)
-        self.spin_offset.setDecimals(6)
+        self.spin_offset = _create_offset_spin()
         layout.addWidget(self.spin_offset, 5, 1)
 
         # 可用变量提示
@@ -2643,75 +2730,42 @@ class CalcTaskConfigDialog(QWidget):
 # ================================================================
 #  计算写入任务配置对话框
 # ================================================================
-class CalcWriteTaskConfigDialog(QWidget):
+class CalcWriteTaskConfigDialog(_BaseWriteTaskDialog):
     """计算写入任务配置对话框 — 将指定任务的实时值写入设备"""
-    calc_write_task_added = Signal(dict)
+
+    _conn_label = "写入连接:"
 
     def __init__(self, connections: dict, calc_tasks: list, polling_tasks: list):
-        super().__init__()
-        self._connections = connections
+        # _build_ui 在基类 __init__ 中调用，需先备好源任务列表
         self._calc_tasks = calc_tasks
         self._polling_tasks = polling_tasks
-        self.setWindowTitle("添加计算写入任务")
-        self.setWindowModality(Qt.ApplicationModal)
-        self.setMinimumWidth(520)
-        self._build_ui()
+        super().__init__(connections, "添加计算写入任务", min_width=520)
 
     def _build_ui(self):
         layout = QGridLayout(self)
 
-        # 源任务选择
+        # 源任务选择（本对话框特有，置于最前）
         layout.addWidget(QLabel("数据源任务:"), 0, 0)
         self.cmb_source = QComboBox()
         self._build_source_combo()
         layout.addWidget(self.cmb_source, 0, 1)
 
-        # 所属连接
-        layout.addWidget(QLabel("写入连接:"), 1, 0)
-        self.cmb_conn = QComboBox()
-        for cid, info in self._connections.items():
-            self.cmb_conn.addItem(_connection_display_label(cid, info), cid)
-        layout.addWidget(self.cmb_conn, 1, 1)
+        # 其余公共行从第 1 行开始
+        self._add_common_write_rows(layout, 1)
 
-        # 任务名称
-        layout.addWidget(QLabel("任务名称:"), 2, 0)
-        self.edit_name = QLineEdit("计算写入任务")
-        layout.addWidget(self.edit_name, 2, 1)
+    def _default_name(self) -> str:
+        return "计算写入任务"
 
-        # 设备类型
-        layout.addWidget(QLabel("设备类型:"), 3, 0)
-        self.cmb_device = QComboBox()
-        layout.addWidget(self.cmb_device, 3, 1)
+    def _task_id_prefix(self) -> str:
+        return "calcwrite"
 
-        # 起始地址
-        layout.addWidget(QLabel("起始地址:"), 4, 0)
-        self.spin_addr = QSpinBox()
-        self.spin_addr.setRange(0, 999999)
-        layout.addWidget(self.spin_addr, 4, 1)
+    def _validate(self):
+        if not self.cmb_source.currentData():
+            return "请选择数据源任务"
+        return None
 
-        # 写入频率
-        layout.addWidget(QLabel("写入频率(秒):"), 5, 0)
-        self.spin_interval = QDoubleSpinBox()
-        self.spin_interval.setRange(0.05, 3600.0)
-        self.spin_interval.setSingleStep(0.1)
-        self.spin_interval.setDecimals(3)
-        self.spin_interval.setValue(1.0)
-        layout.addWidget(self.spin_interval, 5, 1)
-
-        # 数据类型
-        layout.addWidget(QLabel("数据类型:"), 6, 0)
-        self.cmb_data_type = _create_data_type_combo()
-        layout.addWidget(self.cmb_data_type, 6, 1)
-
-        # 字节序
-        layout.addWidget(QLabel("字节序:"), 7, 0)
-        self.cmb_byte_order = _create_byte_order_combo()
-        layout.addWidget(self.cmb_byte_order, 7, 1)
-
-        self.cmb_conn.currentIndexChanged.connect(self._on_conn_changed)
-        self._on_conn_changed()
-
-        layout.addLayout(_make_ok_cancel_layout(self, self._on_ok), 8, 0, 1, 2)
+    def _extend_task_dict(self, task_dict):
+        task_dict["source_task_id"] = self.cmb_source.currentData()
 
     def _build_source_combo(self):
         """构建源任务下拉列表, 包含计算任务和采集任务"""
@@ -2732,41 +2786,6 @@ class CalcWriteTaskConfigDialog(QWidget):
                 self.cmb_source.addItem(label, t.task_id)
         if not self._calc_tasks and not self._polling_tasks:
             self.cmb_source.setItemText(0, "(无可用任务, 请先添加采集或计算任务)")
-
-    @_safe_event
-    def _on_conn_changed(self, *args):
-        _refresh_device_combo(self.cmb_conn, self.cmb_device,
-                              self._connections, writable=True)
-
-    @_safe_event
-    def _on_ok(self):
-        source_task_id = self.cmb_source.currentData()
-        if not source_task_id:
-            QMessageBox.warning(self, "警告", "请选择数据源任务")
-            return
-        cid = self.cmb_conn.currentData()
-        if cid is None:
-            QMessageBox.warning(self, "警告", "请选择写入连接")
-            return
-        name = self.edit_name.text().strip() or "计算写入任务"
-
-        data_type = self.cmb_data_type.currentText()
-        byte_order = _combo_byte_order(self.cmb_byte_order)
-
-        task_dict = {
-            "task_id": f"calcwrite_{int(time.time()*1000)}",
-            "source_task_id": source_task_id,
-            "connection_id": cid,
-            "connection_type": self._connections[cid]["type"],
-            "device_type": self.cmb_device.currentText(),
-            "start_addr": self.spin_addr.value(),
-            "write_interval": self.spin_interval.value(),
-            "data_type": data_type,
-            "byte_order": byte_order,
-            "name": name,
-        }
-        self.calc_write_task_added.emit(task_dict)
-        self.close()
 
 
 # ================================================================
@@ -3030,11 +3049,11 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "警告", f"连接ID '{conn_id}' 已存在")
             return
         # 串口冲突检测：避免多个连接指向同一物理串口，否则后打开者会因自身占用而失败
-        if conn_type in ("modbus_rtu", "modbus_ascii"):
+        if conn_type in _SERIAL_CONN_TYPES:
             new_port = str(params.get("port", "")).strip().lower()
             if new_port:
                 for cid, info in self._connections.items():
-                    if info["type"] in ("modbus_rtu", "modbus_ascii") and \
+                    if info["type"] in _SERIAL_CONN_TYPES and \
                        str(info["params"].get("port", "")).strip().lower() == new_port:
                         QMessageBox.warning(self, "串口冲突",
                             f"串口 '{params.get('port')}' 已被连接 '{cid}' 占用。\n\n"
@@ -3074,7 +3093,7 @@ class MainWindow(QMainWindow):
             self.status_bar.showMessage(f"连接ID已修改为: {new_value}", 3000)
         elif col == 1:
             conn_type = new_value.lower()
-            if conn_type not in ["modbus_tcp", "modbus_rtu", "modbus_ascii", "keyence"]:
+            if conn_type not in _CONNECTION_TYPES:
                 QMessageBox.warning(self, "警告", f"不支持的连接类型: {new_value}")
                 with _block_signals(self.table_conn):
                     self._refresh_conn_table()
@@ -3086,7 +3105,7 @@ class MainWindow(QMainWindow):
         elif col == 2:
             info = self._connections[conn_id]
             worker_conn = self.worker._connections.get(conn_id)
-            if info["type"] in ["modbus_rtu", "modbus_ascii"]:
+            if info["type"] in _SERIAL_CONN_TYPES:
                 info["params"]["port"] = new_value
                 if worker_conn:
                     worker_conn["connector"].port = new_value
@@ -3100,7 +3119,7 @@ class MainWindow(QMainWindow):
             info = self._connections[conn_id]
             try:
                 val = int(new_value)
-                if info["type"] in ["modbus_rtu", "modbus_ascii"]:
+                if info["type"] in _SERIAL_CONN_TYPES:
                     info["params"]["baudrate"] = val
                     worker_conn = self.worker._connections.get(conn_id)
                     if worker_conn:
@@ -3120,8 +3139,7 @@ class MainWindow(QMainWindow):
     # ---- 任务管理 ----
     @_safe_event
     def _on_add_task(self):
-        if not self._connections:
-            QMessageBox.warning(self, "提示", "请先添加至少一个连接")
+        if not self._require_connections():
             return
         self._task_dialog = TaskConfigDialog(self._connections)
         self._task_dialog.task_added.connect(self._add_task)
@@ -3213,35 +3231,57 @@ class MainWindow(QMainWindow):
         self._ensure_chart(task, task.channel_prefix)
 
     # ---- 写入任务管理 ----
-    @_safe_event
-    def _on_add_write_task(self):
+    def _require_connections(self) -> bool:
+        """配置类对话框的前置校验：至少存在一个连接，否则弹窗提示。"""
         if not self._connections:
             QMessageBox.warning(self, "提示", "请先添加至少一个连接")
+            return False
+        return True
+
+    def _register_write_task(self, task_dict, task_cls, task_list: list,
+                             worker_add, refresh_table, label: str):
+        """写入类任务（固定值/计算值）添加后处理共用流程：
+        实例化→入列→注册到 worker→刷新表格→状态栏提示→确保写线程运行。"""
+        task = task_cls.from_dict(task_dict)
+        task_list.append(task)
+        worker_add(task)
+        refresh_table()
+        self.status_bar.showMessage(f"已添加{label}: {task.name}", 3000)
+        # 若采集已在运行，确保写入线程已启动
+        self.worker.ensure_write_thread()
+
+    def _delete_selected_write_task(self, table, task_list: list,
+                                    worker_remove, refresh_table, label: str):
+        """从指定写入任务表删除选中行对应的任务（固定值写入/计算值写入共用）。"""
+        row = table.currentRow()
+        if row < 0 or row >= len(task_list):
+            QMessageBox.warning(self, "提示",
+                                f"请先在{label}表中选择要删除的任务")
+            return
+        task = task_list.pop(row)
+        worker_remove(task.task_id)
+        refresh_table()
+        self.status_bar.showMessage(f"已删除{label}: {task.name}", 3000)
+
+    @_safe_event
+    def _on_add_write_task(self):
+        if not self._require_connections():
             return
         self._write_task_dialog = WriteTaskConfigDialog(self._connections)
-        self._write_task_dialog.write_task_added.connect(self._add_write_task)
+        self._write_task_dialog.task_submitted.connect(self._add_write_task)
         self._write_task_dialog.show()
 
     @_safe_event
     def _add_write_task(self, task_dict):
-        task = WriteTask.from_dict(task_dict)
-        self._write_tasks.append(task)
-        self.worker.add_write_task(task)
-        self._refresh_write_table()
-        self.status_bar.showMessage(f"已添加写入任务: {task.name}", 3000)
-        # 若采集已在运行，确保写入线程已启动
-        self.worker.ensure_write_thread()
+        self._register_write_task(
+            task_dict, WriteTask, self._write_tasks,
+            self.worker.add_write_task, self._refresh_write_table, "写入任务")
 
     @_safe_event
     def _on_del_write_task(self):
-        row = self.table_write.currentRow()
-        if row < 0 or row >= len(self._write_tasks):
-            QMessageBox.warning(self, "提示", "请先在写入任务表中选择要删除的任务")
-            return
-        task = self._write_tasks.pop(row)
-        self.worker.remove_write_task(task.task_id)
-        self._refresh_write_table()
-        self.status_bar.showMessage(f"已删除写入任务: {task.name}", 3000)
+        self._delete_selected_write_task(
+            self.table_write, self._write_tasks,
+            self.worker.remove_write_task, self._refresh_write_table, "写入任务")
 
     @staticmethod
     def _set_table_row_status(table, row: int, success: bool, status_text: str):
@@ -3291,37 +3331,29 @@ class MainWindow(QMainWindow):
     # ---- 计算写入任务管理 ----
     @_safe_event
     def _on_add_calc_write_task(self):
-        if not self._connections:
-            QMessageBox.warning(self, "提示", "请先添加至少一个连接")
+        if not self._require_connections():
             return
         if not self._calc_tasks and not self._tasks:
             QMessageBox.warning(self, "提示", "请先添加至少一个采集任务或计算任务 (计算写入任务需要引用数据源)")
             return
         self._calc_write_task_dialog = CalcWriteTaskConfigDialog(
             self._connections, self._calc_tasks, self._tasks)
-        self._calc_write_task_dialog.calc_write_task_added.connect(self._add_calc_write_task)
+        self._calc_write_task_dialog.task_submitted.connect(self._add_calc_write_task)
         self._calc_write_task_dialog.show()
 
     @_safe_event
     def _add_calc_write_task(self, task_dict):
-        task = CalcWriteTask.from_dict(task_dict)
-        self._calc_write_tasks.append(task)
-        self.worker.add_calc_write_task(task)
-        self._refresh_calc_write_table()
-        self.status_bar.showMessage(f"已添加计算写入任务: {task.name}", 3000)
-        # 若采集已在运行，确保写入线程已启动
-        self.worker.ensure_write_thread()
+        self._register_write_task(
+            task_dict, CalcWriteTask, self._calc_write_tasks,
+            self.worker.add_calc_write_task, self._refresh_calc_write_table,
+            "计算写入任务")
 
     @_safe_event
     def _on_del_calc_write_task(self):
-        row = self.table_calc_write.currentRow()
-        if row < 0 or row >= len(self._calc_write_tasks):
-            QMessageBox.warning(self, "提示", "请先在计算写入任务表中选择要删除的任务")
-            return
-        task = self._calc_write_tasks.pop(row)
-        self.worker.remove_calc_write_task(task.task_id)
-        self._refresh_calc_write_table()
-        self.status_bar.showMessage(f"已删除计算写入任务: {task.name}", 3000)
+        self._delete_selected_write_task(
+            self.table_calc_write, self._calc_write_tasks,
+            self.worker.remove_calc_write_task,
+            self._refresh_calc_write_table, "计算写入任务")
 
     @_safe_event
     def _refresh_calc_write_table(self):
@@ -3357,7 +3389,7 @@ class MainWindow(QMainWindow):
             self.status_bar.showMessage(f"任务连接已修改为: {new_value}", 3000)
         elif col == 1:
             conn_type = new_value.lower()
-            if conn_type not in ["modbus_tcp", "modbus_rtu", "modbus_ascii", "keyence"]:
+            if conn_type not in _CONNECTION_TYPES:
                 QMessageBox.warning(self, "警告", f"不支持的连接类型: {new_value}")
                 with _block_signals(self.table_task):
                     self._refresh_task_table()
@@ -3530,7 +3562,7 @@ class MainWindow(QMainWindow):
                 conn_type = info["type"]
                 self.table_conn.setItem(i, 1, QTableWidgetItem(conn_type))
 
-                if conn_type in ["modbus_rtu", "modbus_ascii"]:
+                if conn_type in _SERIAL_CONN_TYPES:
                     host_text = p.get("port", "")
                     port_text = f"{p.get('baudrate', 9600)}"
                 else:
