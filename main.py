@@ -30,6 +30,12 @@ from typing import Optional
 
 try:
     import yaml
+
+    class _IndentDumper(yaml.Dumper):
+        """强制块序列（列表）随父级键一起缩进。"""
+
+        def increase_indent(self, flow=False, indentless=False):
+            return super().increase_indent(flow, False)
 except ImportError:
     yaml = None
 
@@ -185,8 +191,12 @@ class DataStore:
         return len(records)
 
     def clear(self):
+        """清空所有采集数据（保留通道注册信息，否则清空后重新采集时
+        add_data 会因通道未注册而丢弃所有样本，导致界面无法刷新）"""
         with self._lock:
-            self._channels.clear()
+            for ch in self._channels.values():
+                ch["timestamps"].clear()
+                ch["values"].clear()
             self._all_records.clear()
 
     def get_record_count(self) -> int:
@@ -3965,7 +3975,11 @@ class MainWindow(QMainWindow):
         try:
             with open(self._config_file, "w", encoding="utf-8") as f:
                 if yaml is not None:
-                    yaml.dump(config, f, allow_unicode=True, default_flow_style=False, indent=2)
+                    yaml.dump(
+                        config, f, Dumper=_IndentDumper,
+                        allow_unicode=True, default_flow_style=False,
+                        indent=2, sort_keys=False,
+                    )
                 else:
                     json.dump(config, f, ensure_ascii=False, indent=2)
             self.status_bar.showMessage(f"配置已保存: {self._config_file}", 3000)
@@ -4036,6 +4050,7 @@ class _TeeStream:
         self._original = original
         self._log_file = log_file
         self._lock = threading.Lock()
+        self._at_line_start = True  # 跟踪日志文件当前是否处于行首，用于按行添加时间戳
 
     def write(self, text):
         if not text:
@@ -4047,7 +4062,13 @@ class _TeeStream:
             pass
         with self._lock:
             try:
-                self._log_file.write(text)
+                # 写入日志文件时为每行添加时间戳前缀（空行不加）
+                for line in text.splitlines(keepends=True):
+                    if self._at_line_start and line.strip():
+                        self._log_file.write(
+                            datetime.now().strftime("[%Y-%m-%d %H:%M:%S] "))
+                    self._log_file.write(line)
+                    self._at_line_start = line.endswith("\n")
                 self._log_file.flush()
             except Exception:
                 pass
