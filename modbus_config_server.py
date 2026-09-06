@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-ModbusTCP 服务端（全功能码 + 配置文件驱动版）
+Modbus TCP/RTU 服务端（全功能码 + 配置文件驱动 + 多服务端）
 
 支持的功能码：
     01 Read Coils                      读线圈
@@ -30,15 +30,22 @@ ModbusTCP 服务端（全功能码 + 配置文件驱动版）
 
 未在配置中出现的地址，自动表现为普通可读写寄存器/线圈（初始值0/False）。
 
+服务端:
+    支持在一个配置文件中配置多个服务端（顶层 servers 列表，可混合 tcp / rtu，
+    每个服务端运行在独立线程中）。server 条目未定义 identity / datastore / areas
+    时自动回退到顶层定义，此时多个 server 共享同一份数据区（状态互通）；
+    需要独立数据状态的 server 在自己的条目里定义 areas/datastore 即可。
+    兼容旧版顶层单个 server 块的写法（仅启动一个服务端）。
+
 依赖:
-    pip install pymodbus==3.8.6 pyyaml
+    pip install "pymodbus[serial]==3.8.6" pyyaml    # serial extra 包含 RTU 所需的 pyserial
 """
 
 import argparse
 import logging
 import random
 import threading
-
+ 
 import yaml
 from pymodbus.datastore import (
     ModbusSequentialDataBlock,
@@ -46,7 +53,7 @@ from pymodbus.datastore import (
     ModbusSlaveContext,
 )
 from pymodbus.device import ModbusDeviceIdentification
-from pymodbus.server import StartTcpServer
+from pymodbus.server import StartSerialServer, StartTcpServer
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
@@ -203,12 +210,17 @@ BIT_TYPE_MAP = {
 # 这里把数据块自身的基地址设为 1，再在读写时换算回 0 基地址，
 # 这样配置文件里写 address: 0 就正好对应主站请求的地址 0。
 
-class ConfigurableRegisterBlock(ModbusSequentialDataBlock):
-    """通用 16位寄存器数据块，供 holding_registers / input_registers 复用。"""
+class ConfigurableBlock(ModbusSequentialDataBlock):
+    """通用数据块，供四类数据区复用。
 
-    def __init__(self, size: int, handlers: dict):
-        super().__init__(1, [0] * size)
+    寄存器区（holding_registers / input_registers）传 default_value=0，
+    位区（coils / discrete_inputs）传 default_value=False。
+    """
+
+    def __init__(self, size: int, handlers: dict, default_value=0):
+        super().__init__(1, [default_value] * size)
         self.handlers = handlers
+        self.default_value = default_value
 
     def getValues(self, address, count=1):
         values = []
@@ -219,7 +231,10 @@ class ConfigurableRegisterBlock(ModbusSequentialDataBlock):
                 values.append(handler.read())
             else:
                 idx = client_addr
-                values.append(self.values[idx] if 0 <= idx < len(self.values) else 0)
+                values.append(
+                    type(self.default_value)(self.values[idx])
+                    if 0 <= idx < len(self.values) else self.default_value
+                )
         super().setValues(address, values)
         return values
 
@@ -234,37 +249,6 @@ class ConfigurableRegisterBlock(ModbusSequentialDataBlock):
         super().setValues(address, values)
 
 
-class ConfigurableBitBlock(ModbusSequentialDataBlock):
-    """通用 1位(bool)数据块，供 coils / discrete_inputs 复用。"""
-
-    def __init__(self, size: int, handlers: dict):
-        super().__init__(1, [False] * size)
-        self.handlers = handlers
-
-    def getValues(self, address, count=1):
-        values = []
-        for offset in range(count):
-            client_addr = address - 1 + offset
-            handler = self.handlers.get(client_addr)
-            if handler:
-                values.append(handler.read())
-            else:
-                idx = client_addr
-                values.append(bool(self.values[idx]) if 0 <= idx < len(self.values) else False)
-        super().setValues(address, values)
-        return values
-
-    def setValues(self, address, values):
-        if not isinstance(values, list):
-            values = [values]
-        for offset, v in enumerate(values):
-            client_addr = address - 1 + offset
-            handler = self.handlers.get(client_addr)
-            if handler:
-                handler.write(bool(v))
-        super().setValues(address, values)
-
-
 # ---------------------------------------------------------------------------
 # 配置加载与解析
 # ---------------------------------------------------------------------------
@@ -274,13 +258,16 @@ def load_config(path: str) -> dict:
         return yaml.safe_load(f)
 
 
-def build_word_handlers(entries: list):
+def build_handlers(entries: list, type_map: dict, kind: str):
+    """按配置条目构建 {地址: 取值策略} 映射，type_map 为类型名到工厂函数的映射。"""
     handlers, max_addr = {}, -1
     for reg in entries:
         addr, count, rtype = reg["address"], reg.get("count", 1), reg.get("type")
-        factory = REGISTER_TYPE_MAP.get(rtype)
+        factory = type_map.get(rtype)
         if factory is None:
-            raise ValueError(f"未知的寄存器类型: {rtype!r}（可选: random/fixed/increment/static）")
+            raise ValueError(
+                f"未知的{kind}类型: {rtype!r}（可选: {'/'.join(type_map)}）"
+            )
         for i in range(count):
             a = addr + i
             handlers[a] = factory(reg)
@@ -288,47 +275,27 @@ def build_word_handlers(entries: list):
     return handlers, max_addr
 
 
-def build_bit_handlers(entries: list):
-    handlers, max_addr = {}, -1
-    for reg in entries:
-        addr, count, rtype = reg["address"], reg.get("count", 1), reg.get("type")
-        factory = BIT_TYPE_MAP.get(rtype)
-        if factory is None:
-            raise ValueError(f"未知的线圈/离散输入类型: {rtype!r}（可选: random/fixed/toggle/static）")
-        for i in range(count):
-            a = addr + i
-            handlers[a] = factory(reg)
-            max_addr = max(max_addr, a)
-    return handlers, max_addr
-
-
-def build_context(config: dict) -> ModbusServerContext:
-    areas = config.get("areas", {})
-    ds_cfg = config.get("datastore", {})
-
-    co_handlers, co_max = build_bit_handlers(areas.get("coils", []))
-    di_handlers, di_max = build_bit_handlers(areas.get("discrete_inputs", []))
-    ir_handlers, ir_max = build_word_handlers(areas.get("input_registers", []))
-    hr_handlers, hr_max = build_word_handlers(areas.get("holding_registers", []))
+def build_slave_context(areas: dict, ds_cfg: dict) -> ModbusSlaveContext:
+    """根据 areas/datastore 配置构建从站数据区。"""
+    co_handlers, co_max = build_handlers(areas.get("coils", []), BIT_TYPE_MAP, "线圈/离散输入")
+    di_handlers, di_max = build_handlers(areas.get("discrete_inputs", []), BIT_TYPE_MAP, "线圈/离散输入")
+    ir_handlers, ir_max = build_handlers(areas.get("input_registers", []), REGISTER_TYPE_MAP, "寄存器")
+    hr_handlers, hr_max = build_handlers(areas.get("holding_registers", []), REGISTER_TYPE_MAP, "寄存器")
 
     co_size = max(co_max + 1, ds_cfg.get("coils_size", 0), DEFAULT_AREA_SIZE)
     di_size = max(di_max + 1, ds_cfg.get("discrete_inputs_size", 0), DEFAULT_AREA_SIZE)
     ir_size = max(ir_max + 1, ds_cfg.get("input_registers_size", 0), DEFAULT_AREA_SIZE)
     hr_size = max(hr_max + 1, ds_cfg.get("holding_registers_size", 0), DEFAULT_AREA_SIZE)
 
-    slave_context = ModbusSlaveContext(
-        co=ConfigurableBitBlock(co_size, co_handlers),
-        di=ConfigurableBitBlock(di_size, di_handlers),
-        ir=ConfigurableRegisterBlock(ir_size, ir_handlers),
-        hr=ConfigurableRegisterBlock(hr_size, hr_handlers),
+    return ModbusSlaveContext(
+        co=ConfigurableBlock(co_size, co_handlers, default_value=False),
+        di=ConfigurableBlock(di_size, di_handlers, default_value=False),
+        ir=ConfigurableBlock(ir_size, ir_handlers, default_value=0),
+        hr=ConfigurableBlock(hr_size, hr_handlers, default_value=0),
     )
 
-    slave_id = config.get("server", {}).get("slave_id", 1)
-    return ModbusServerContext(slaves={slave_id: slave_context}, single=False)
 
-
-def build_identity(config: dict) -> ModbusDeviceIdentification:
-    id_cfg = config.get("server", {}).get("identity", {})
+def build_identity(id_cfg: dict) -> ModbusDeviceIdentification:
     return ModbusDeviceIdentification(info_name={
         "VendorName": id_cfg.get("vendor_name", "PyModbusSim"),
         "ProductCode": id_cfg.get("product_code", "PMS"),
@@ -339,22 +306,92 @@ def build_identity(config: dict) -> ModbusDeviceIdentification:
     })
 
 
-def run_server(config_path: str = "config.yml"):
-    config = load_config(config_path)
-    server_cfg = config.get("server", {})
-    ip = server_cfg.get("ip", "0.0.0.0")
-    port = server_cfg.get("port", 502)
+# ---------------------------------------------------------------------------
+# 服务端启动：支持多服务端（servers 列表），每个服务端运行在独立线程
+# ---------------------------------------------------------------------------
+
+def start_server(server_cfg: dict, config: dict, shared_slave: ModbusSlaveContext):
+    """启动单个服务端（阻塞直到服务停止），server 未定义的配置段回退到顶层。"""
+    name = server_cfg.get("name", "server")
+    mode = str(server_cfg.get("mode", "tcp")).lower()
     slave_id = server_cfg.get("slave_id", 1)
 
-    context = build_context(config)
-    identity = build_identity(config)
+    # 数据区：server 自带 areas/datastore 时独立构建，否则共享顶层配置的数据区
+    srv_areas = server_cfg.get("areas")
+    srv_ds = server_cfg.get("datastore")
+    if srv_areas is not None or srv_ds is not None:
+        slave = build_slave_context(
+            srv_areas if srv_areas is not None else config.get("areas", {}),
+            srv_ds if srv_ds is not None else config.get("datastore", {}),
+        )
+    else:
+        slave = shared_slave
 
-    log.info("ModbusTCP 服务启动: %s:%s, 从站ID=%s", ip, port, slave_id)
-    StartTcpServer(context=context, identity=identity, address=(ip, port))
+    context = ModbusServerContext(slaves={slave_id: slave}, single=False)
+    identity = build_identity(server_cfg.get("identity") or config.get("identity") or {})
+
+    if mode == "tcp":
+        ip = server_cfg.get("ip", "0.0.0.0")
+        port = server_cfg.get("port", 502)
+        log.info("[%s] ModbusTCP 服务启动: %s:%s, 从站ID=%s", name, ip, port, slave_id)
+        StartTcpServer(context=context, identity=identity, address=(ip, port))
+    elif mode == "rtu":
+        serial_cfg = server_cfg.get("serial", {})
+        port = serial_cfg.get("port", "COM3")
+        baudrate = int(serial_cfg.get("baudrate", 9600))
+        bytesize = int(serial_cfg.get("bytesize", 8))
+        parity = str(serial_cfg.get("parity", "N")).upper()
+        stopbits = int(serial_cfg.get("stopbits", 1))
+        log.info("[%s] ModbusRTU 服务启动: %s @ %s %s%s%s, 从站ID=%s",
+                 name, port, baudrate, bytesize, parity, stopbits, slave_id)
+        StartSerialServer(
+            context=context,
+            identity=identity,
+            port=port,
+            baudrate=baudrate,
+            bytesize=bytesize,
+            parity=parity,
+            stopbits=stopbits,
+        )
+    else:
+        raise ValueError(f"未知的通信模式: {mode!r}（可选: tcp/rtu）")
+
+
+def _run_server_safe(server_cfg: dict, config: dict, shared_slave: ModbusSlaveContext):
+    """线程入口：单个服务端启动失败不影响其他服务端。"""
+    try:
+        start_server(server_cfg, config, shared_slave)
+    except Exception:
+        log.exception("服务端 %s 启动失败", server_cfg.get("name", "?"))
+
+
+def run_servers(config_path: str = "config.yml"):
+    """加载配置并启动所有服务端（每个服务端一个独立线程）。"""
+    config = load_config(config_path)
+    server_cfgs = config.get("servers") or [config.get("server", {})]
+
+    # 顶层 areas/datastore 构建的共享数据区：未自定义数据区的 server 共用同一实例
+    shared_slave = build_slave_context(config.get("areas", {}), config.get("datastore", {}))
+
+    threads = []
+    for srv in server_cfgs:
+        t = threading.Thread(
+            target=_run_server_safe, args=(srv, config, shared_slave),
+            name=f"modbus-{srv.get('name', 'server')}", daemon=True,
+        )
+        t.start()
+        threads.append(t)
+
+    log.info("共启动 %d 个服务端，按 Ctrl+C 退出", len(threads))
+    try:
+        for t in threads:
+            t.join()
+    except KeyboardInterrupt:
+        log.info("收到退出信号，服务停止")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="ModbusTCP 服务端（全功能码 + 配置文件驱动）")
+    parser = argparse.ArgumentParser(description="Modbus TCP/RTU 服务端（全功能码 + 配置文件驱动，支持多服务端）")
     parser.add_argument("-c", "--config", default="config.yml", help="YAML 配置文件路径")
     args = parser.parse_args()
-    run_server(args.config)
+    run_servers(args.config)

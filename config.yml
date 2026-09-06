@@ -1,16 +1,20 @@
-# ModbusTCP 服务端配置文件（全功能码版）
+# Modbus TCP/RTU 服务端配置文件（全功能码版）
+#
+# 支持两种写法：
+#   1) servers 列表：一个配置文件同时启动多个服务端，可混合 tcp / rtu
+#   2) 旧版写法：顶层单个 server 块（仅启动一个服务端）
+# server 条目未定义 identity / datastore / areas 时，自动回退到顶层定义；
+# 此时多个 server 共享同一份数据区（状态互通），需要独立数据状态的 server
+# 在自己的条目里定义 areas/datastore 即可。
 
-server:
-  ip: "0.0.0.0"
-  port: 502
-  slave_id: 1
-  identity:                          # 可选：功能码 43/14 Read Device Identification 用
-    vendor_name: "MyCompany"
-    product_code: "PY-MB-SIM"
-    vendor_url: "https://example.com"
-    product_name: "Modbus TCP Simulator"
-    model_name: "Sim-1"
-    major_minor_revision: "1.0"
+# ---------------- 共享配置（server 条目未指定时回退到这里） ----------------
+identity:                            # 可选：功能码 43/14 Read Device Identification 用
+  vendor_name: "MyCompany"
+  product_code: "PY-MB-SIM"
+  vendor_url: "https://example.com"
+  product_name: "Modbus TCP Simulator"
+  model_name: "Sim-1"
+  major_minor_revision: "1.0"
 
 datastore:                           # 可选：每个区不指定则默认100
   coils_size: 100
@@ -76,3 +80,21 @@ areas:
       count: 10
       type: static           # 可写：主站用06/16/22写入后，读回的就是写入的值
       value: 0
+
+# ---------------- 服务端列表（可混合 tcp / rtu，全部同时启动） ----------------
+servers:
+  - name: "tcp-502"
+    mode: tcp
+    ip: "0.0.0.0"                    # mode: tcp 时的监听地址
+    port: 502                        # mode: tcp 时的监听端口
+    slave_id: 1
+
+  - name: "rtu-com13"
+    mode: rtu                        # mode: rtu（需 pip install pyserial）
+    slave_id: 1
+    serial:
+      port: "COM13"                  # Windows: COM13；Linux: /dev/ttyUSB0
+      baudrate: 9600
+      bytesize: 8
+      parity: "N"                    # N 无校验 / E 偶校验 / O 奇校验
+      stopbits: 1

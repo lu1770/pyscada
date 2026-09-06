@@ -1264,17 +1264,11 @@ class KeyencePLCConnector(_TCPConnectorMixin):
                 [0, 1000], "uint32", "abcd")
         """
         try:
-            raw_bytes = KeyencePLCConnector.pack_words(words)
+            raw_bytes = _words_to_bytes(words)
             return ByteOrderDecoder.decode(raw_bytes, data_type, byte_order)
         except Exception as e:
             logger.error("[KeyencePLCConnector] 解析失败: %s", e)
             return None
-
-    @staticmethod
-    def pack_words(words: list) -> bytes:
-        """将 16 位寄存器值列表（十进制）打包为大端原始字节（每值2字节）。
-        parse_words 解码与采集轮询打包共用。"""
-        return _words_to_bytes(words)
 
     @staticmethod
     def _parse_scalar(word_list: list, expected_len: int,
@@ -1449,6 +1443,11 @@ class _BaseWriteTask:
             "name": self.name,
         }
 
+    @classmethod
+    def from_dict(cls, d):
+        """子类共用的反序列化：直接按字典参数构造实例。"""
+        return cls(**d)
+
 
 class WriteTask(_BaseWriteTask):
     """单个写入任务配置 — 周期性向设备写入固定值"""
@@ -1469,10 +1468,6 @@ class WriteTask(_BaseWriteTask):
         d = self._base_dict()
         d["value"] = self.value
         return d
-
-    @classmethod
-    def from_dict(cls, d):
-        return cls(**d)
 
 
 # ================================================================
@@ -1501,10 +1496,6 @@ class CalcWriteTask(_BaseWriteTask):
         d = self._base_dict()
         d["source_task_id"] = self.source_task_id
         return d
-
-    @classmethod
-    def from_dict(cls, d):
-        return cls(**d)
 
 
 # ================================================================
@@ -3091,31 +3082,26 @@ class MainWindow(QMainWindow):
         if col == 0:
             if not new_value:
                 QMessageBox.warning(self, "警告", "连接ID不能为空")
-                with _block_signals(self.table_conn):
-                    self._refresh_conn_table()
+                self._blocked_refresh(self.table_conn, self._refresh_conn_table)
                 return
             if new_value != conn_id and new_value in self._connections:
                 QMessageBox.warning(self, "警告", f"连接ID '{new_value}' 已存在")
-                with _block_signals(self.table_conn):
-                    self._refresh_conn_table()
+                self._blocked_refresh(self.table_conn, self._refresh_conn_table)
                 return
             worker_conn = self.worker._connections.pop(conn_id, None)
             if worker_conn:
                 self.worker._connections[new_value] = worker_conn
             self._connections[new_value] = self._connections.pop(conn_id)
-            with _block_signals(self.table_conn):
-                self._refresh_conn_table()
+            self._blocked_refresh(self.table_conn, self._refresh_conn_table)
             self.status_bar.showMessage(f"连接ID已修改为: {new_value}", 3000)
         elif col == 1:
             conn_type = new_value.lower()
             if conn_type not in _CONNECTION_TYPES:
                 QMessageBox.warning(self, "警告", f"不支持的连接类型: {new_value}")
-                with _block_signals(self.table_conn):
-                    self._refresh_conn_table()
+                self._blocked_refresh(self.table_conn, self._refresh_conn_table)
                 return
             self._connections[conn_id]["type"] = conn_type
-            with _block_signals(self.table_conn):
-                self._refresh_conn_table()
+            self._blocked_refresh(self.table_conn, self._refresh_conn_table)
             self.status_bar.showMessage(f"连接类型已修改为: {new_value}", 3000)
         elif col == 2:
             info = self._connections[conn_id]
@@ -3128,8 +3114,7 @@ class MainWindow(QMainWindow):
                 info["params"]["host"] = new_value
                 if worker_conn:
                     worker_conn["connector"].host = new_value
-            with _block_signals(self.table_conn):
-                self._refresh_conn_table()
+            self._blocked_refresh(self.table_conn, self._refresh_conn_table)
         elif col == 3:
             info = self._connections[conn_id]
             try:
@@ -3144,12 +3129,10 @@ class MainWindow(QMainWindow):
                     worker_conn = self.worker._connections.get(conn_id)
                     if worker_conn:
                         worker_conn["connector"].port = val
-                with _block_signals(self.table_conn):
-                    self._refresh_conn_table()
+                self._blocked_refresh(self.table_conn, self._refresh_conn_table)
             except ValueError:
                 QMessageBox.warning(self, "警告", "端口/波特率必须为整数")
-                with _block_signals(self.table_conn):
-                    self._refresh_conn_table()
+                self._blocked_refresh(self.table_conn, self._refresh_conn_table)
 
     # ---- 任务管理 ----
     @_safe_event
@@ -3309,6 +3292,22 @@ class MainWindow(QMainWindow):
             item.setText(status_text)
         item.setForeground(QColor("#a6e3a1") if success else QColor("#f38ba8"))
 
+    @staticmethod
+    def _fill_table(table, tasks, cell_getters):
+        """按列构造函数填充表格（写入任务表共用）。
+        cell_getters: 每个元素为 task -> 显示文本 的函数，列表索引即列号。"""
+        with _block_signals(table):
+            table.setRowCount(len(tasks))
+            for i, task in enumerate(tasks):
+                for col, getter in enumerate(cell_getters):
+                    table.setItem(i, col, QTableWidgetItem(getter(task)))
+
+    @staticmethod
+    def _blocked_refresh(table, refresh_method):
+        """阻塞表格信号后执行刷新，避免刷新时触发 cellChanged 递归。"""
+        with _block_signals(table):
+            refresh_method()
+
     @_safe_event
     def _on_write_status(self, task_id, success, message):
         # 计算写入任务：失败时状态列显示具体原因
@@ -3331,17 +3330,16 @@ class MainWindow(QMainWindow):
 
     @_safe_event
     def _refresh_write_table(self):
-        with _block_signals(self.table_write):
-            self.table_write.setRowCount(len(self._write_tasks))
-            for i, task in enumerate(self._write_tasks):
-                self.table_write.setItem(i, 0, QTableWidgetItem(task.name))
-                self.table_write.setItem(i, 1, QTableWidgetItem(task.connection_id))
-                self.table_write.setItem(i, 2, QTableWidgetItem(task.connection_type))
-                self.table_write.setItem(i, 3, QTableWidgetItem(task.device_type))
-                self.table_write.setItem(i, 4, QTableWidgetItem(str(task.start_addr)))
-                self.table_write.setItem(i, 5, QTableWidgetItem(str(task.value)))
-                self.table_write.setItem(i, 6, QTableWidgetItem(f"{task.write_interval:g}"))
-                self.table_write.setItem(i, 7, QTableWidgetItem("—"))
+        self._fill_table(self.table_write, self._write_tasks, [
+            lambda t: t.name,
+            lambda t: t.connection_id,
+            lambda t: t.connection_type,
+            lambda t: t.device_type,
+            lambda t: str(t.start_addr),
+            lambda t: str(t.value),
+            lambda t: f"{t.write_interval:g}",
+            lambda t: "—",
+        ])
 
     # ---- 计算写入任务管理 ----
     @_safe_event
@@ -3372,17 +3370,16 @@ class MainWindow(QMainWindow):
 
     @_safe_event
     def _refresh_calc_write_table(self):
-        with _block_signals(self.table_calc_write):
-            self.table_calc_write.setRowCount(len(self._calc_write_tasks))
-            for i, task in enumerate(self._calc_write_tasks):
-                self.table_calc_write.setItem(i, 0, QTableWidgetItem(task.name))
-                self.table_calc_write.setItem(i, 1, QTableWidgetItem(task.source_task_id))
-                self.table_calc_write.setItem(i, 2, QTableWidgetItem(task.connection_id))
-                self.table_calc_write.setItem(i, 3, QTableWidgetItem(task.device_type))
-                self.table_calc_write.setItem(i, 4, QTableWidgetItem(str(task.start_addr)))
-                self.table_calc_write.setItem(i, 5, QTableWidgetItem(f"{task.write_interval:g}"))
-                self.table_calc_write.setItem(i, 6, QTableWidgetItem(task.data_type))
-                self.table_calc_write.setItem(i, 7, QTableWidgetItem("—"))
+        self._fill_table(self.table_calc_write, self._calc_write_tasks, [
+            lambda t: t.name,
+            lambda t: t.source_task_id,
+            lambda t: t.connection_id,
+            lambda t: t.device_type,
+            lambda t: str(t.start_addr),
+            lambda t: f"{t.write_interval:g}",
+            lambda t: t.data_type,
+            lambda t: "—",
+        ])
 
     @_safe_event
     def _on_task_cell_changed(self, row, col):
@@ -3394,72 +3391,58 @@ class MainWindow(QMainWindow):
         if col == 0:
             if new_value not in self._connections:
                 QMessageBox.warning(self, "警告", f"连接ID '{new_value}' 不存在")
-                with _block_signals(self.table_task):
-                    self._refresh_task_table()
+                self._blocked_refresh(self.table_task, self._refresh_task_table)
                 return
             task.connection_id = new_value
             task.connection_type = self._connections[new_value]["type"]
-            with _block_signals(self.table_task):
-                self._refresh_task_table()
+            self._blocked_refresh(self.table_task, self._refresh_task_table)
             self.status_bar.showMessage(f"任务连接已修改为: {new_value}", 3000)
         elif col == 1:
             conn_type = new_value.lower()
             if conn_type not in _CONNECTION_TYPES:
                 QMessageBox.warning(self, "警告", f"不支持的连接类型: {new_value}")
-                with _block_signals(self.table_task):
-                    self._refresh_task_table()
+                self._blocked_refresh(self.table_task, self._refresh_task_table)
                 return
             task.connection_type = conn_type
-            with _block_signals(self.table_task):
-                self._refresh_task_table()
+            self._blocked_refresh(self.table_task, self._refresh_task_table)
         elif col == 2:
             task.device_type = new_value
-            with _block_signals(self.table_task):
-                self._refresh_task_table()
+            self._blocked_refresh(self.table_task, self._refresh_task_table)
         elif col == 3:
             try:
                 task.start_addr = int(new_value)
-                with _block_signals(self.table_task):
-                    self._refresh_task_table()
+                self._blocked_refresh(self.table_task, self._refresh_task_table)
             except ValueError:
                 QMessageBox.warning(self, "警告", "起始地址必须为整数")
-                with _block_signals(self.table_task):
-                    self._refresh_task_table()
+                self._blocked_refresh(self.table_task, self._refresh_task_table)
         elif col == 4:
             try:
                 qty = int(new_value)
                 if qty < 1 or qty > 125:
                     QMessageBox.warning(self, "警告", "读取数量必须在 1-125 之间")
-                    with _block_signals(self.table_task):
-                        self._refresh_task_table()
+                    self._blocked_refresh(self.table_task, self._refresh_task_table)
                     return
                 task.quantity = qty
-                with _block_signals(self.table_task):
-                    self._refresh_task_table()
+                self._blocked_refresh(self.table_task, self._refresh_task_table)
             except ValueError:
                 QMessageBox.warning(self, "警告", "读取数量必须为整数")
-                with _block_signals(self.table_task):
-                    self._refresh_task_table()
+                self._blocked_refresh(self.table_task, self._refresh_task_table)
         elif col == 5:
             QMessageBox.warning(self, "提示", "通道前缀不可编辑，请删除任务后重新添加")
-            with _block_signals(self.table_task):
-                self._refresh_task_table()
+            self._blocked_refresh(self.table_task, self._refresh_task_table)
         elif col == 6:
             if not new_value:
                 QMessageBox.warning(self, "警告", "通道名称不能为空")
-                with _block_signals(self.table_task):
-                    self._refresh_task_table()
+                self._blocked_refresh(self.table_task, self._refresh_task_table)
                 return
             old_name = task.channel_name
             task.channel_name = new_value
-            with _block_signals(self.table_task):
-                self._refresh_task_table()
+            self._blocked_refresh(self.table_task, self._refresh_task_table)
             self._update_chart_for_task(task)
             self.status_bar.showMessage(f"通道名称已修改: {old_name} -> {new_value}", 3000)
         elif col == 7:
             task.unit = new_value
-            with _block_signals(self.table_task):
-                self._refresh_task_table()
+            self._blocked_refresh(self.table_task, self._refresh_task_table)
 
     @_safe_event
     def _update_chart_for_task(self, task):
