@@ -1,45 +1,78 @@
-# ModbusTCP 服务端配置文件
+# ModbusTCP 服务端配置文件（全功能码版）
 
 server:
-  ip: "0.0.0.0"      # 监听地址，0.0.0.0 表示监听所有网卡
-  port: 502           # 监听端口
-  slave_id: 1         # 从站(Slave) ID
+  ip: "0.0.0.0"
+  port: 502
+  slave_id: 1
+  identity:                          # 可选：功能码 43/14 Read Device Identification 用
+    vendor_name: "MyCompany"
+    product_code: "PY-MB-SIM"
+    vendor_url: "https://example.com"
+    product_name: "Modbus TCP Simulator"
+    model_name: "Sim-1"
+    major_minor_revision: "1.0"
 
-# datastore.size 可选：指定寄存器区间总大小（不小于下面配置的最大地址+1）
-datastore:
-  size: 100
+datastore:                           # 可选：每个区不指定则默认100
+  coils_size: 100
+  discrete_inputs_size: 100
+  input_registers_size: 100
+  holding_registers_size: 100
 
-# 寄存器配置：可以配置多段，每段一种模式
-registers:
-  # 地址 0~9：随机数，范围 0~65535
-  - address: 0
-    count: 10
-    type: random
-    min: 0
-    max: 65535
+areas:
+  # ---------------- 线圈 Coils（功能码 01 读 / 05 06写单个 / 15 写多个）----------------
+  coils:
+    - address: 0
+      count: 8
+      type: fixed
+      value: false
 
-  # 地址 10~14：固定值 1234
-  - address: 10
-    count: 5
-    type: fixed
-    value: 1234
+    - address: 8
+      count: 8
+      type: toggle          # 每次读取 True/False 交替
 
-  # 地址 20~24：自增长，从0开始，每次读取+1，到100后回绕到0
-  - address: 20
-    count: 5
-    type: increment
-    start: 0
-    step: 1
-    min: 0
-    max: 100
-    wrap: true
+    - address: 16
+      count: 8
+      type: static          # 可写：主站用05/15写入后，读回的就是写入的值
+      value: false
 
-  # 地址 30：自增长，不回绕，到达max后停在max
-  - address: 30
-    count: 1
-    type: increment
-    start: 0
-    step: 5
-    min: 0
-    max: 20
-    wrap: false
+  # ---------------- 离散输入 Discrete Inputs（只读，功能码 02）----------------
+  discrete_inputs:
+    - address: 0
+      count: 8
+      type: random
+
+  # ---------------- 输入寄存器 Input Registers（只读，功能码 04）----------------
+  input_registers:
+    - address: 0
+      count: 10
+      type: random
+      min: 0
+      max: 1000
+
+  # ---------------- 保持寄存器 Holding Registers ----------------
+  # 功能码 03读 / 06写单个 / 16写多个 / 22掩码写 / 23读写多个
+  holding_registers:
+    - address: 0
+      count: 10
+      type: random
+      min: 0
+      max: 65535
+
+    - address: 10
+      count: 5
+      type: fixed
+      value: 1234
+
+    - address: 20
+      count: 5
+      type: increment
+      start: 0
+      step: 1
+      min: 0
+      max: 100
+      wrap: true
+
+    - address: 40
+      count: 10
+      type: static           # 可写：主站用06/16/22写入后，读回的就是写入的值
+      value: 0

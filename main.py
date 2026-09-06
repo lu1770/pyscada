@@ -22,6 +22,7 @@ import re
 import math
 import time
 import json
+import logging
 import struct
 import socket
 import threading
@@ -59,9 +60,14 @@ from PySide6.QtGui import QColor
 import pyqtgraph as pg
 
 
+# 模块级日志器：全程序日志统一经 logging 输出（控制台 + 日志文件），
+# handler 与级别由 main() 中的 setup_logging() 配置。
+logger = logging.getLogger("daq")
+
+
 def _safe_event(func):
     """事件处理器装饰器：捕获并记录所有异常，防止 UI 崩溃。
-    异常将带完整 traceback 写入日志文件（经 stderr Tee），并弹出提示框。
+    异常将带完整 traceback 经 logging 写入日志，并弹出提示框。
     若处理器接收 Qt 事件对象（含 accept 方法），异常时仍调用 accept 以避免阻塞窗口关闭。"""
     def wrapper(*args, **kwargs):
         try:
@@ -364,12 +370,15 @@ class ByteOrderDecoder:
             try:
                 result = cls.decode(raw_bytes, data_type, byte_order)
                 if result == expected:
-                    print(f"✓ {data_type}/{byte_order}: {raw_bytes.hex()} -> {result}")
+                    logger.info("✓ %s/%s: %s -> %s",
+                                data_type, byte_order, raw_bytes.hex(), result)
                 else:
-                    print(f"✗ {data_type}/{byte_order}: {raw_bytes.hex()} -> {result}, expected {expected}")
+                    logger.error("✗ %s/%s: %s -> %s, expected %s",
+                                 data_type, byte_order, raw_bytes.hex(),
+                                 result, expected)
                     all_pass = False
             except Exception as e:
-                print(f"✗ {data_type}/{byte_order}: {e}")
+                logger.error("✗ %s/%s: %s", data_type, byte_order, e)
                 all_pass = False
         return all_pass
 
@@ -563,8 +572,9 @@ class _TCPConnectorMixin:
                 self._sock.connect((self.host, self.port))
                 return True
             except Exception as e:
-                print(f"[{getattr(self, 'LOG_TAG', 'TCP')}] 连接失败 "
-                      f"{self.host}:{self.port} -> {e}")
+                logger.error("[%s] 连接失败 %s:%s -> %s",
+                             getattr(self, "LOG_TAG", "TCP"),
+                             self.host, self.port, e)
                 self._sock = None
                 return False
 
@@ -681,7 +691,8 @@ class ModbusBaseConnector:
         func_code = pdu[1]
         if func_code & 0x80:
             exc_code = pdu[2] if len(pdu) > 2 else -1
-            print(f"[{self.LOG_TAG}] 异常响应: func={func_code:#x}, exc={exc_code}")
+            logger.warning("[%s] 异常响应: func=%#x, exc=%s",
+                           self.LOG_TAG, func_code, exc_code)
             return None
         return func_code
 
@@ -769,7 +780,7 @@ class ModbusTCPConnector(_TCPConnectorMixin, ModbusBaseConnector):
                     return None
                 return resp[6:]  # 去掉 MBAP 头（6字节），返回统一 PDU
             except Exception as e:
-                print(f"[Modbus] 通信错误: {e}")
+                logger.error("[Modbus] 通信错误: %s", e)
                 self.disconnect()
                 return None
 
@@ -813,11 +824,12 @@ class ModbusTCPConnector(_TCPConnectorMixin, ModbusBaseConnector):
                 func_resp = resp[7]
                 if func_resp & 0x80:
                     exc_code = resp[8] if len(resp) > 8 else -1
-                    print(f"[Modbus TCP] 写入异常: func={func_resp:#x}, exc={exc_code}")
+                    logger.error("[Modbus TCP] 写入异常: func=%#x, exc=%s",
+                                 func_resp, exc_code)
                     return False
                 return True
             except Exception as e:
-                print(f"[Modbus TCP] 写入通信错误: {e}")
+                logger.error("[Modbus TCP] 写入通信错误: %s", e)
                 self.disconnect()
                 return False
 
@@ -850,7 +862,8 @@ class ModbusSerialConnector(ModbusBaseConnector):
 
     def connect(self) -> bool:
         if serial is None:
-            print(f"[{self.LOG_TAG}] 连接失败 {self.port} -> 缺少 pyserial 依赖，请安装: pip install pyserial")
+            logger.error("[%s] 连接失败 %s -> 缺少 pyserial 依赖，请安装: pip install pyserial",
+                         self.LOG_TAG, self.port)
             return False
         with self._lock:
             # 释放可能残留的旧句柄，避免自身占用串口导致重新打开失败（串口连接冲突）
@@ -867,7 +880,7 @@ class ModbusSerialConnector(ModbusBaseConnector):
                 )
                 return True
             except Exception as e:
-                print(f"[{self.LOG_TAG}] 连接失败 {self.port} -> {e}")
+                logger.error("[%s] 连接失败 %s -> %s", self.LOG_TAG, self.port, e)
                 self._ser = None
                 return False
 
@@ -911,7 +924,7 @@ class ModbusSerialConnector(ModbusBaseConnector):
                 self._ser.flush()
                 return self._recv_pdu()
             except Exception as e:
-                print(f"[{self.LOG_TAG}] 通信错误: {e}")
+                logger.error("[%s] 通信错误: %s", self.LOG_TAG, e)
                 self.disconnect()
                 return None
 
@@ -928,7 +941,7 @@ class ModbusSerialConnector(ModbusBaseConnector):
                 pdu = self._recv_pdu()
                 return self._check_write_pdu(func_code, pdu)
             except Exception as e:
-                print(f"[{self.LOG_TAG}] 写入通信错误: {e}")
+                logger.error("[%s] 写入通信错误: %s", self.LOG_TAG, e)
                 self.disconnect()
                 return False
 
@@ -939,7 +952,8 @@ class ModbusSerialConnector(ModbusBaseConnector):
         func_resp = pdu[1]
         if func_resp & 0x80:
             exc_code = pdu[2] if len(pdu) > 2 else -1
-            print(f"[{self.LOG_TAG}] 写入异常: func={func_resp:#x}, exc={exc_code}")
+            logger.error("[%s] 写入异常: func=%#x, exc=%s",
+                         self.LOG_TAG, func_resp, exc_code)
             return False
         # 验证回显地址/功能码与请求一致
         if pdu[0] != self.slave_id or pdu[1] != func_code:
@@ -1163,10 +1177,10 @@ class KeyencePLCConnector(_TCPConnectorMixin):
                         break
                 return resp.decode("ascii", errors="replace").strip("\r\n")
             except socket.timeout:
-                print(f"[Keyence] 响应超时: {cmd}")
+                logger.warning("[Keyence] 响应超时: %s", cmd)
                 return None
             except Exception as e:
-                print(f"[Keyence] 通信错误: {e}")
+                logger.error("[Keyence] 通信错误: %s", e)
                 self.disconnect()
                 return None
 
@@ -1200,7 +1214,7 @@ class KeyencePLCConnector(_TCPConnectorMixin):
         if resp is None:
             return None
         if resp.startswith("E"):
-            print(f"[Keyence] PLC错误: {resp} (命令: {cmd})")
+            logger.warning("[Keyence] PLC错误: %s (命令: %s)", resp, cmd)
             return None
         values = resp.split()
         if not values:
@@ -1211,10 +1225,11 @@ class KeyencePLCConnector(_TCPConnectorMixin):
             # 类型转换与字节序解码交给 _poll_one 中的 ByteOrderDecoder，
             # 与 Modbus 路径保持一致。
             output = [int(v, 10) for v in values]
-            print(f"[Keyence] 命令: {cmd} 读取 {count} 个寄存器原始值: {output}")
+            logger.debug("[Keyence] 命令: %s 读取 %s 个寄存器原始值: %s",
+                         cmd, count, output)
             return output
         except ValueError:
-            print(f"[Keyence] 响应解析失败: {resp} (命令: {cmd})")
+            logger.error("[Keyence] 响应解析失败: %s (命令: %s)", resp, cmd)
             return None
 
     @staticmethod
@@ -1252,7 +1267,7 @@ class KeyencePLCConnector(_TCPConnectorMixin):
             raw_bytes = KeyencePLCConnector.pack_words(words)
             return ByteOrderDecoder.decode(raw_bytes, data_type, byte_order)
         except Exception as e:
-            print(f"[KeyencePLCConnector] 解析失败: {e}")
+            logger.error("[KeyencePLCConnector] 解析失败: %s", e)
             return None
 
     @staticmethod
@@ -1316,13 +1331,13 @@ class KeyencePLCConnector(_TCPConnectorMixin):
         cmd = f"WR {dt}{start_addr}{type_suffix} {value_str}"
         resp = self._send_command(cmd)
         if resp is None:
-            print(f"[Keyence] PLC写入超时: {cmd}")
+            logger.error("[Keyence] PLC写入超时: %s", cmd)
             return False
         if resp.startswith("E"):
-            print(f"[Keyence] PLC写入错误: {resp} (命令: {cmd})")
+            logger.error("[Keyence] PLC写入错误: %s (命令: %s)", resp, cmd)
             return False
         # 成功响应为 "OK" 或空字符串（视型号而定），不含 'E' 即视为成功
-        print(f"[Keyence] PLC写入成功: {resp} (命令: {cmd})")
+        logger.info("[Keyence] PLC写入成功: %s (命令: %s)", resp, cmd)
         return True
 
 
@@ -1763,7 +1778,7 @@ class AcquisitionWorker(QObject):
         try:
             return ByteOrderDecoder.decode(raw_bytes, data_type, byte_order)
         except Exception as e:
-            print(f"[ByteOrderDecoder] 解码失败: {e}")
+            logger.warning("[ByteOrderDecoder] 解码失败: %s", e)
             return None
 
     def _poll_one(self, connector, task: PollingTask):
@@ -1933,7 +1948,7 @@ class AcquisitionWorker(QObject):
             if not connector.connect():
                 return False, "设备未连接且重连失败"
         try:
-            print(f"[写入] 开始写入: {value} 到 {task.connection_id}")
+            logger.info("[写入] 开始写入: %s 到 %s", value, task.connection_id)
             if isinstance(connector, ModbusBaseConnector):
                 if task.device_type == "coil":
                     # 线圈：value 非0视为 ON
@@ -1957,7 +1972,7 @@ class AcquisitionWorker(QObject):
                     return True, f"写入成功: {value}"
                 return False, "写入失败（PLC返回错误或无响应）"
             else:
-                print(f"[警告] 不支持的连接器类型: {type(connector).__name__}")
+                logger.error("不支持的连接器类型: %s", type(connector).__name__)
                 return False, f"不支持的连接器类型: {type(connector).__name__}"
         except Exception as e:
             # 完整 traceback 写入日志，调用方仅接收简短信息
@@ -3678,95 +3693,85 @@ class MainWindow(QMainWindow):
 
 
 # ================================================================
-#  第九部分: 程序入口
+#  第九部分: 日志配置与程序入口
 # ================================================================
-class _TeeStream:
-    """同时写入原流与日志文件的分流器"""
-
-    def __init__(self, original, log_file):
-        self._original = original
-        self._log_file = log_file
-        self._lock = threading.Lock()
-        self._at_line_start = True  # 跟踪日志文件当前是否处于行首，用于按行添加时间戳
-
-    def write(self, text):
-        if not text:
-            return
-        try:
-            self._original.write(text)
-            self._original.flush()
-        except Exception:
-            pass
-        with self._lock:
-            try:
-                # 写入日志文件时为每行添加时间戳前缀（空行不加）
-                for line in text.splitlines(keepends=True):
-                    if self._at_line_start and line.strip():
-                        self._log_file.write(
-                            datetime.now().strftime("[%Y-%m-%d %H:%M:%S] "))
-                    self._log_file.write(line)
-                    self._at_line_start = line.endswith("\n")
-                self._log_file.flush()
-            except Exception:
-                pass
-
-    def flush(self):
-        try:
-            self._original.flush()
-        except Exception:
-            pass
-        with self._lock:
-            try:
-                self._log_file.flush()
-            except Exception:
-                pass
-
-    def reconfigure(self, **kwargs):
-        # 兼容 sys.stdout.reconfigure 调用（如 build.py 中的 UTF-8 设置）
-        try:
-            self._original.reconfigure(**kwargs)
-        except Exception:
-            pass
-
-
 def _log_exception(exc_type, exc_value, exc_tb, source="未处理异常"):
-    """将异常完整 traceback 写入日志文件（经 stderr Tee 落盘）。
+    """将异常完整 traceback 经 logging 写入控制台与日志文件。
 
     所有异常（主线程/工作线程/被捕获的处理异常）统一经此入口记录，
     确保即使 GUI 或控制台不可用也能持久化完整堆栈。
     日志通道本身故障时静默，避免抛出二次异常导致递归。"""
     try:
-        tb_text = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
-        sys.stderr.write(f"\n[{source}] {exc_type.__name__}: {exc_value}\n{tb_text}\n")
+        logger.error("[%s] %s: %s", source, exc_type.__name__, exc_value,
+                     exc_info=(exc_type, exc_value, exc_tb))
     except Exception:
         pass
 
 
-def _setup_file_logging():
-    """将 stdout/stderr 同时写入控制台和当前用户 Downloads/daq_logs 下的时间戳日志文件，
-    并安装全局异常钩子以捕获所有未处理异常（主线程与工作线程）。"""
+def setup_logging(level: int = logging.INFO):
+    """配置全局日志：同时输出到控制台和当前用户 Downloads/daq_logs 下的
+    时间戳日志文件，并安装全局异常钩子以捕获所有未处理异常（主线程与工作线程）。
+    日志目录/文件不可用时自动退化为仅控制台输出。"""
     # 日志写入当前 Windows 用户的 Downloads 文件夹下的 daq_logs 子目录
     log_dir = os.path.join(os.path.expanduser("~"), "Downloads", "daq_logs")
-    os.makedirs(log_dir, exist_ok=True)
-    log_path = os.path.join(log_dir, f"daq_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
-
+    log_path = None
     try:
-        log_file = open(log_path, "w", encoding="utf-8", buffering=1)
+        os.makedirs(log_dir, exist_ok=True)
+        log_path = os.path.join(
+            log_dir, f"daq_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
     except Exception as e:
-        print(f"[警告] 无法创建日志文件: {e}")
+        logging.basicConfig(
+            level=level,
+            format="[%(asctime)s] %(levelname)-7s %(name)s: %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S")
+        logger.error("无法创建日志目录 %s: %s（仅控制台输出）", log_dir, e)
+        _install_excepthooks()
         return
 
-    print(f"[日志] 输出文件: {log_path}")
-    sys.stdout = _TeeStream(sys.stdout, log_file)
-    sys.stderr = _TeeStream(sys.stderr, log_file)
+    root_logger = logging.getLogger()
+    root_logger.setLevel(level)
+    # 清理可能存在的旧 handler，避免重复输出
+    for handler in list(root_logger.handlers):
+        root_logger.removeHandler(handler)
+        try:
+            handler.close()
+        except Exception:
+            pass
+
+    formatter = logging.Formatter(
+        "[%(asctime)s] %(levelname)-7s %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S")
+
+    console_handler = logging.StreamHandler()  # 默认输出到 sys.stderr
+    console_handler.setFormatter(formatter)
+    root_logger.addHandler(console_handler)
+
+    try:
+        file_handler = logging.FileHandler(log_path, mode="w", encoding="utf-8")
+    except Exception as e:
+        logger.error("无法创建日志文件 %s: %s（仅控制台输出）", log_path, e)
+    else:
+        file_handler.setFormatter(formatter)
+        root_logger.addHandler(file_handler)
+        logger.info("日志输出文件: %s", log_path)
+
+    _install_excepthooks()
+
+
+def _install_excepthooks():
+    """安装主线程与工作线程的全局异常钩子，确保未处理异常的完整
+    traceback 经 logging 落盘；GUI 环境下同时弹窗提示用户。"""
 
     def _excepthook(exc_type, exc_value, exc_tb):
-        # 先写日志（通过 stderr tee 落盘）
+        # KeyboardInterrupt 保留默认的中断退出行为
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc_value, exc_tb)
+            return
         _log_exception(exc_type, exc_value, exc_tb, source="未处理异常")
-        # 同时弹窗提示用户（GUI 环境）
         try:
             from PySide6.QtWidgets import QMessageBox
-            tb_text = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+            tb_text = "".join(
+                traceback.format_exception(exc_type, exc_value, exc_tb))
             QMessageBox.critical(None, "未处理的异常", tb_text[-2000:])
         except Exception:
             pass
@@ -3786,7 +3791,7 @@ def _setup_file_logging():
 
 
 def main():
-    _setup_file_logging()
+    setup_logging()
     QApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
     app = QApplication(sys.argv)
